@@ -23,7 +23,7 @@ repos:
     hooks:
       - id: mypy
         name: mypy (src)
-        args: [--show-error-codes, '--ignore-missing-imports']
+        args: [--show-error-codes, '--ignore-missing-imports','--cache-dir', 'backend/.mypy_cache']
         files: src/ #ensures that mypy only checks files within the src directory.
         #pass_filenames: false #disables passing file names to mypy, allowing it to discover files on its own within the specified directory.
         language_version: python3 #sets the Python version to use for the mypy hook.
