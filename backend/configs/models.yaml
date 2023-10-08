@@ -1,0 +1,7 @@
+openai:
+  - gpt-3.5-turbo
+  - text-davinci-002
+  - text-davinci-003
+  - code-davinci-002
+gpt4all:
+  - ggml-gpt4all-j-v1.3-groovy.bin

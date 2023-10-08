@@ -1,0 +1,28 @@
+site_name: codinit
+site_description: An LLM based coding assistant that helps coders geenerate code based on a specific set of libraries.
+site_author: Nesrine Zarrouki
+site_url: none
+repo_url: https://github.com/gordonwilliamsburg/codinit.git
+theme:
+  name: "material"
+markdown_extensions:
+  - pymdownx.highlight: # enable code syntax highlight
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.arithmatex: #math
+      generic: true
+
+extra_javascript: #math
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra:
+  mathjax: true
+
+nav:
+  - Home: 'index.md'
+
+plugins:
+  - search #add a search functionality to the MKDocs-generated documentation site
+  - mkdocstrings

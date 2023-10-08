@@ -1,0 +1,8 @@
+openai:
+  - text-embedding-ada-002
+  - text-embedding-davinci-001
+  - text-embedding-curie-001
+  - text-embedding-babbage-001
+  - text-embedding-ada-001
+huggingface:
+  - sentence-transformers/all-mpnet-base-v2

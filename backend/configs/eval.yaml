@@ -1,0 +1,13 @@
+eval_columns:
+  - Run_ID
+  - Task_ID
+  - Task
+  - Generation_ID
+  - Code
+  - Linter_Output
+  - Metric
+  - Error_Log
+  - Git_SHA
+  - Commit_Message
+  - Timestamp
+eval_dataset_location: data/code_evals.csv
