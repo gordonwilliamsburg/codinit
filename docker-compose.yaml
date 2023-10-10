@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+      # add any other environment variables your backend might need
+    volumes:
+      - ./backend:/app  # optional: for live code changes to reflect in the container
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/codinit  # optional: for live code changes to reflect in the container
+      - /codinit/node_modules
+    depends_on:
+      - backend  # assuming frontend needs backend to be running first
