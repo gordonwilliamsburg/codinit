@@ -40,6 +40,8 @@ libcst = "^1.0.1"
 llama-index = "^0.8.22"
 nest-asyncio = "^1.5.6"
 apify-client = "^1.4.1"
+streamlit-nested-layout = "^0.1.1"
+streamlit-aggrid = "^0.3.4.post3"
 
 
 [tool.poetry.group.dev.dependencies]

@@ -22,7 +22,7 @@ ANSWER_PATTERN = r"[a-zA-Z]+"
 DEPENDENCY_BLACKLIST = set(["random", "json"])
 
 
-def _trim_md(code_editor):
+def _trim_md(code_editor: PythonCodeEditor):
     if code_editor.source_code:
         code_editor.source_code[0] = code_editor.source_code[0].replace("```python", "")
         code_editor.source_code[-1] = code_editor.source_code[-1].replace("```", "")
