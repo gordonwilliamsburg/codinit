@@ -74,9 +74,12 @@ class PythonCodeEditor(CodeEditorTooling):
         """
         refactor code to move all library imports to top of the file and runs isort for import sorting
         """
-        refactored_code = refactor_code(code=code, library_name=library_name)
-        sorted_code = isort.code(refactored_code)
-        return sorted_code
+        if len(code) > 0:
+            refactored_code = refactor_code(code=code, library_name=library_name)
+            sorted_code = isort.code(refactored_code)
+            return sorted_code
+        else:
+            return code
 
     def validate_code_imports(self, code: str, dependencies: List[str]):
         final_result: Dict[str, bool] = {}
