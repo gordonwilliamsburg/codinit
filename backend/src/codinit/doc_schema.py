@@ -3,13 +3,9 @@ from codinit.config import client
 library_class = {
     "class": "Library",
     "description": "A code library",
-    "vectorizer": "text2vec-huggingface",
+    "vectorizer": "text2vec-openai",
     "moduleConfig": {
-        "text2vec-huggingface": {
-            "vectorizeClassName": True,
-            "model": "sentence-transformers/all-MiniLM-L6-v2",
-            "options": {"waitForModel": True},
-        }
+        "text2vec-openai": {"model": "ada", "modelVersion": "002", "type": "text"}
     },
     "properties": [
         {"name": "name", "dataType": ["text"]},
@@ -26,19 +22,15 @@ library_class = {
 documentation_file_class = {
     "class": "DocumentionFile",
     "description": "A documentation file of a library",
-    "vectorizer": "text2vec-huggingface",
+    "vectorizer": "text2vec-openai",
     "moduleConfig": {
-        "text2vec-huggingface": {
-            "vectorizeClassName": True,
-            "model": "sentence-transformers/all-MiniLM-L6-v2",
-            "options": {"waitForModel": True},
-        }
+        "text2vec-openai": {"model": "ada", "modelVersion": "002", "type": "text"}
     },
     "properties": [
         {
             "name": "title",
             "dataType": ["text"],
-            "description": "The name of the author",
+            "description": "title of the document",
         },
         {
             "name": "description",

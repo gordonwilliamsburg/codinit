@@ -3,7 +3,6 @@ import re
 from typing import List, Optional
 
 import weaviate
-from langchain import LLMChain, PromptTemplate
 from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders.base import Document
 from langchain.document_loaders.recursive_url_loader import RecursiveUrlLoader
