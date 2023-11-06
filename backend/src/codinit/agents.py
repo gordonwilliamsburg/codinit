@@ -155,15 +155,13 @@ def install_dependencies(deps: List[str]) -> List[str]:
     return deps
 
 
-def execute_code(thought: str, code: str):
+def execute_code(code: str):
     """
-    Executes python code. Input is:
-    thought: str, explains logic behind code
-    code: str, contains python code
+    Executes python code. Input:
+    code: a JSON compatible one-line string that contains python code
     """
     code = extract_code_from_text(code)
     code = remove_magic_commands(code)
-    print(thought)
     print(code)
     return code
 
