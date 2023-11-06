@@ -287,9 +287,6 @@ prompt=PromptTemplate.from_template(prompt_template)
 llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.5, max_tokens=1024)
 llm_chain =LLMChain(llm=llm, prompt=prompt)
 
-Strings should be enclosed in double quotes "".
-Control characters within strings (like newlines) must be escaped.
-
 Now please help with the subtask below.
 Make sure to call the "execute_code" function to run your code!!
 """
