@@ -61,6 +61,7 @@ class OpenAIAgent:
             return print(f"Not allowed: {fc.name}")
         if fc:
             f = globals()[fc.name]
+            print(fc.arguments)
             return f(**json.loads(fc.arguments))
 
     def call_gpt(
@@ -110,9 +111,9 @@ class OpenAIAgent:
             functions=function_schemas,
             function_name=function_name,
         )
-        print(gpt_response)
+        # print(gpt_response)
         function_output = self.call_func(gpt_response)
-        print(function_output)
+        # print(function_output)
         return function_output
 
 
@@ -156,7 +157,8 @@ def install_dependencies(deps: List[str]) -> List[str]:
 
 def execute_code(code: str):
     """
-    Executes python code. Input is code: python code in the form of a string
+    Executes python code. Input is:
+    code: a string that contains python code
     """
     code = extract_code_from_text(code)
     code = remove_magic_commands(code)
