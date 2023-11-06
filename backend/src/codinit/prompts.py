@@ -168,10 +168,49 @@ The task will necessitate the use of some custom libraries. You will be provided
 documentation of the library to accomplish the task.
 Please have a look at the provided context and try to give the steps that are helpful to accomplish this task.
 make sure to use the planning function which expects a list of steps, each step is a string.
+First, let's see an example of what we expect:
+Task: Fetch the contents of the endpoint 'https://example.com/api' and write to a file
+Context:
+let's try to get a webpage. For this example, let's get GitHub's public timeline:
+requests.request(method, url, **kwargs)
+Constructs and sends a Request.
+Usage:
+```python
+import requests
+req = requests.request('GET', 'https://httpbin.org/get')
+```
+There's also a builtin JSON decoder, in case you're dealing with JSON data:
+```python
+import requests
+r = requests.get('https://api.github.com/events')
+r.json()
+```
+Steps:[
+    "1. I should import the requests library",
+    "2. I should use requests library to fetch the results from the endpoint 'https://example.com/api' and save to a variable called response",
+    "3. I should access the variable response and parse the contents by decoding the JSON contents",
+    "4. I should open a local file in write mode and use the json library to dump the results."
+]
+Example 2:
+Task: Write a random number to a file
+Context:
+Functions for sequences
+random.choice(seq)
+Return a random element from the non-empty sequence seq. If seq is empty, raises IndexError.
+Steps:[
+    "1. I should import the random library.",
+    "2. I should define the output file name.",
+    "3. I open a file and write the random number into it."
+]
+Now let's begin with a real task. Remember you should break it down into tractable implementation chunks, step-by-step, like in the example.
+If you plan to define functions, make sure to name them appropriately.
+If you plan to use libraries, make sure to say which ones exactly. BE PRECISE.
+Your output plan should NEVER modify an existing code, only add new code.
+Keep it simple, stupid
 """
 planner_user_prompt_template = """
-Context: {context}.
 Task: '{task}'.
+Context: {context}.
 """
 dependency_tracker_system_prompt = """
 You're an AI master at understanding code.
