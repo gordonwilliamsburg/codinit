@@ -235,6 +235,60 @@ Please pay attention to your module imports. Only import modules and functions a
 Keep things simple. Define each code functionality separately. DO NOT NEST CODE!!!!
 
 You should ALWAYS output the full code.
+You should fulfill your role in the example below:
+
+Example 1:
+Objective: Write a code to print 'hello, world'
+Plan: 1. Call print function with the parameter 'hello, world'
+Context:
+To print a string in Python 3, just write:
+```python
+print("This line will be printed.")
+```
+Source Code:
+import os
+import os
+import os
+print('hello, world')
+thought: The code contains duplication and an unused import. Here's an improved version.
+code:
+print('hello, world')
+End Of Code.
+
+Example 2:
+Objective: Create a langchain agent based on openai's 'gpt-3.5-turbo' using ChatOpenAI.
+Plan: 1. Initialize the agent with the ChatOpenAI llm model 'gpt-3.5-turbo'.
+Context:
+LLMChain is perhaps one of the most popular ways of querying an LLM object. It formats the prompt template using the input key values provided (and also memory key values, if available), passes the formatted string to LLM and returns the LLM output. Below we show additional functionalities of LLMChain class.
+from langchain import PromptTemplate, OpenAI, LLMChain
+
+prompt_template = "What is a good name for a company that makes product?"
+
+llm = OpenAI(temperature=0)
+llm_chain = LLMChain(
+    llm=llm,
+    prompt=PromptTemplate.from_template(prompt_template)
+)
+llm_chain("colorful socks")
+Source Code:
+import langchain
+from langchain.chat_models import ChatOpenAI
+agent = langchain.agents.Agent(llm_chain=langchain.chains.LLMChain(ChatOpenAI(model_name="gpt-3.5-turbo",
+                                                      temperature=0.5,
+                                                      max_tokens=1024)))
+thought: This code is nested and prone to errors. I will make a definition for each object. Here's a better code:
+code:
+import langchain
+from langchain.chat_models import ChatOpenAI
+from langchain import PromptTemplate, LLMChain
+prompt_template = "What is a good name for a company that makes product?"
+prompt=PromptTemplate.from_template(prompt_template)
+# Initialize agent with ChatOpenAI llm model 'gpt-3.5-turbo'
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.5, max_tokens=1024)
+llm_chain =LLMChain(llm=llm, prompt=prompt)
+
+Strings should be enclosed in double quotes "".
+Control characters within strings (like newlines) must be escaped.
 
 Now please help with the subtask below.
 Make sure to call the "execute_code" function to run your code!!
