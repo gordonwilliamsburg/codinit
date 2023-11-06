@@ -9,7 +9,12 @@ import requests
 from langchain.chat_models import ChatOpenAI
 from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
 
-from codinit.agents import CodeCorrector, Coder, DependencyTracker, Planner
+from codinit.agents import (
+    code_correcting_agent,
+    coding_agent,
+    dependency_agent,
+    planner_agent,
+)
 from codinit.code_editor import PythonCodeEditor
 from codinit.config import client, eval_settings
 
@@ -42,11 +47,7 @@ class TaskExecutionConfig:
     planner_temperature = 0
     coder_temperature = 0.0
     code_corrector_temperature = 0
-    dependency_tracker_temperature = 0.2
-    planner_model_name = "gpt-3.5-turbo-16k"
-    coder_model_name = "gpt-3.5-turbo-16k"
-    code_corrector_model_name = "gpt-3.5-turbo-16k"
-    dependency_tracker_model_name = "gpt-3.5-turbo-16k"
+    dependency_tracker_temperature = 0
 
 
 class TaskExecutor:
@@ -59,31 +60,16 @@ class TaskExecutor:
         self.config = config
 
         # Planner
-        planner_llm = ChatOpenAI(
-            model=config.planner_model_name, temperature=config.planner_temperature
-        )
-        self.planner = Planner(planner_llm)
+        self.planner = planner_agent
 
         # Coder
-        coder_llm = ChatOpenAI(
-            model=config.coder_model_name, temperature=config.coder_temperature
-        )
-
-        self.coder = Coder(coder_llm)
+        self.coder = coding_agent
 
         # Dependency tracker
-        dependency_tracker_llm = ChatOpenAI(
-            model=config.dependency_tracker_model_name,
-            temperature=config.dependency_tracker_temperature,
-        )
-        self.dependency_tracker = DependencyTracker(dependency_tracker_llm)
+        self.dependency_tracker = dependency_agent
 
         # Code corrector
-        code_corrector_llm = ChatOpenAI(
-            model=config.code_corrector_model_name,
-            temperature=config.code_corrector_temperature,
-        )
-        self.code_corrector = CodeCorrector(code_corrector_llm)
+        self.code_corrector = code_correcting_agent
 
     def install_dependencies(self, deps: List[str]) -> str:
         # if it's a string, e.g. "['openai']", turn into list ['openai']
@@ -192,18 +178,23 @@ class TaskExecutor:
         # get_embedding_store(start_urls=libraries)
         # relevant_docs = get_read_the_docs_context(task, k=10)
         # generate coding plan given context
-        plan = self.planner.execute_task(task=task, context=relevant_docs)
+        plan = self.planner.execute(
+            function_name="execute_plan", task=task, context=relevant_docs
+        )
 
         # install dependencies from plan
         if self.config.execute_code and self.config.install_dependencies:
-            deps = self.dependency_tracker.execute_task(plan="\n".join(plan))
+            deps = self.dependency_tracker.execute(
+                function_name="install_dependencies", plan=plan
+            )
             self.install_dependencies(deps)
 
         # generate code
-        new_code = self.coder.execute_task(
+        new_code = self.coder.execute(
+            task=task,
+            function_name="execute_code",
             source_code=self.code_editor.display_code(),
-            objective=task,
-            plan="\n".join(plan),
+            plan=plan,
             context=relevant_docs,
         )
         new_code = self.format_code(code=new_code, dependencies=deps)
@@ -220,8 +211,12 @@ class TaskExecutor:
             if attempt > self.config.coding_attempts:
                 break
             # corrected code
-            new_code = self.code_corrector.execute_task(
-                context=relevant_docs, source_code=new_code, error=error
+            new_code = self.code_corrector.execute(
+                function_name="execute_code",
+                task=task,
+                context=relevant_docs,
+                source_code=new_code,
+                error=error,
             )
             new_code = self.format_code(code=new_code, dependencies=deps)
             self.code_editor.overwrite_code(new_source=new_code)
@@ -245,6 +240,7 @@ class TaskExecutor:
         # run generated code
         return formatted_code, lint_result, metric
 
+    # TODO: add plan to benchmark
     def execute_and_log(
         self,
         task: str,
@@ -270,20 +266,26 @@ class TaskExecutor:
         # get_embedding_store(start_urls=libraries)
         # relevant_docs = get_read_the_docs_context(task, k=10)
         # generate coding plan given context
-        plan = self.planner.execute_task(task=task, context=relevant_docs)
+        plan = self.planner.execute(
+            function_name="execute_plan", task=task, context=relevant_docs
+        )
 
         # install dependencies from plan
         if self.config.execute_code and self.config.install_dependencies:
-            deps = self.dependency_tracker.execute_task(plan="\n".join(plan))
+            deps = self.dependency_tracker.execute(
+                function_name="install_dependencies", plan=plan
+            )
             self.install_dependencies(deps)
 
         # generate code
-        new_code = self.coder.execute_task(
+        new_code = self.coder.execute(
+            task=task,
+            function_name="execute_code",
             source_code=self.code_editor.display_code(),
-            objective=task,
-            plan="\n".join(plan),
+            plan=plan,
             context=relevant_docs,
         )
+        new_code = self.format_code(code=new_code, dependencies=deps)
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
         )
@@ -313,8 +315,12 @@ class TaskExecutor:
                 break
             time_stamp = datetime.datetime.now().isoformat()
             # corrected code
-            new_code = self.code_corrector.execute_task(
-                context=relevant_docs, source_code=new_code, error=error
+            new_code = self.code_corrector.execute(
+                function_name="execute_code",
+                task=task,
+                context=relevant_docs,
+                source_code=new_code,
+                error=error,
             )
             formatted_code, lint_result, metric = self.format_lint_code(
                 code=new_code, dependencies=deps

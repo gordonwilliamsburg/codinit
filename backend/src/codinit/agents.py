@@ -1,15 +1,119 @@
-import abc
+import inspect
+import json
 import re
+from inspect import Parameter
+from typing import Any, Callable, List, Optional
 
-from langchain import LLMChain, PromptTemplate
-from langchain.memory import ConversationBufferMemory
+import openai
+from openai import ChatCompletion
+from pydantic import create_model
 
+from codinit.config import agent_settings, secrets
 from codinit.prompts import (
-    code_corrector_prompt,
-    coder_prompt,
-    dependency_tracker_prompt,
-    planner_prompt,
+    code_corrector_system_prompt,
+    code_corrector_user_prompt_template,
+    coder_system_prompt,
+    coder_user_prompt_template,
+    dependency_tracker_system_prompt,
+    dependency_tracker_user_prompt_template,
+    planner_system_prompt,
+    planner_user_prompt_template,
 )
+from codinit.pydantic_models import OpenAIResponse
+
+openai.api_key = secrets.openai_api_key
+
+
+class OpenAIAgent:
+    def __init__(
+        self,
+        model: str = "gpt-3.5-turbo",
+        system_prompt: str = "",
+        user_prompt_template="",
+        functions: List[Callable[..., Any]] = [],
+    ):
+        self.model = model
+        self.functions = functions
+        self.func_names = [func.__name__ for func in self.functions]
+        self.system_prompt = system_prompt
+        self.user_prompt_template = user_prompt_template
+
+    def get_schema(self, function: Callable[..., Any]):
+        # function to extract schema of a function from the function code
+        kw = {
+            n: (o.annotation, ... if o.default == Parameter.empty else o.default)
+            for n, o in inspect.signature(function).parameters.items()
+        }
+        parameters = create_model(f"Input for `{function.__name__}`", **kw).schema()
+        function_schema = dict(
+            name=function.__name__, description=function.__doc__, parameters=parameters
+        )
+        return function_schema
+
+    def call_func(self, response: OpenAIResponse) -> Any:
+        """
+        Extract name and arguments of the function from the response from the OpenAI ChatCompletion API,
+        Get the corresponding function from the current file,
+        then call the function with extracted arguments.
+        """
+        fc = response.choices[0].message.function_call
+        if fc and fc.name not in self.func_names:
+            return print(f"Not allowed: {fc.name}")
+        if fc:
+            f = globals()[fc.name]
+            return f(**json.loads(fc.arguments))
+
+    def call_gpt(
+        self,
+        user_prompt: str,
+        system_prompt: Optional[str] = None,
+        functions=None,
+        function_name: str = "",
+    ) -> OpenAIResponse:
+        """
+        Calls the GPT model and returns the completion.
+
+        Args:
+        - user_prompt (str): The prompt provided by the user.
+        - system_prompt (Optional[str]): An optional system prompt.
+        - model (str): The GPT model version. Default is "gpt-3.5-turbo".
+        - **kwargs: Additional keyword arguments for the ChatCompletion.
+
+        Returns:
+        - Any: The result from ChatCompletion.
+        """
+
+        # Start by adding the user's message to the messages list
+        messages = [{"role": "user", "content": user_prompt}]
+
+        # If there's a system prompt, insert it at the beginning of the messages list
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+
+        # Call the ChatCompletion API to get the model's response and return the result
+        response = ChatCompletion.create(
+            model=self.model,
+            messages=messages,
+            functions=functions,
+            function_call={"name": function_name},
+        )
+
+        # Convert the response to an OpenAIResponse object and return
+        return OpenAIResponse(**response)
+
+    def execute(self, function_name: str, **kwargs):
+        user_prompt = self.user_prompt_template.format(**kwargs)
+        function_schemas = [self.get_schema(function=func) for func in self.functions]
+        gpt_response = self.call_gpt(
+            user_prompt=user_prompt,
+            system_prompt=self.system_prompt,
+            functions=function_schemas,
+            function_name=function_name,
+        )
+        print(gpt_response)
+        function_output = self.call_func(gpt_response)
+        print(function_output)
+        return function_output
 
 
 def extract_code_from_text(text):
@@ -28,122 +132,103 @@ def remove_magic_commands(code: str) -> str:
 
     # Use re.sub() to replace those lines with an empty string
     cleaned_code = re.sub(pattern, "", code)
-
+    # TODO: sometimes, the only thing returned by the code is a magic command
+    # for example !pip install openai
+    # when this is removed, the linter throws an error because it finds no code to parse
+    # need to check at the linter side if code is empty.
     return cleaned_code
 
 
-class BaseAgent:
-    def __init__(self, llm) -> None:
-        self.llm = llm
-
-    @abc.abstractmethod
-    def parse_output(self, raw_result):
-        raise NotImplementedError()
-
-    def execute_task(self, **kwargs):
-        prompt = PromptTemplate(
-            input_variables=list(kwargs.keys()) + ["chat_history"],
-            template=self.prompt_template,
-        )
-        memory = ConversationBufferMemory(
-            memory_key="chat_history", input_key=self.input_key
-        )
-        llm_chain = LLMChain(
-            llm=self.llm,
-            prompt=prompt,
-            verbose=False,
-            memory=memory,
-        )
-        raw_result = llm_chain.predict(**kwargs)
-        # print("--------------------------raw result-------------------")
-        # print(raw_result)
-        # if self.stop_string in raw_result:
-        #    raw_result = raw_result.split(self.stop_string)[0]
-        parsed_result = self.parse_output(raw_result)
-        # print("--------------------------parsed result-------------------")
-        # print(parsed_result)
-        return parsed_result
+def execute_plan(steps: List[str]) -> List[str]:
+    """
+    takes the plan as a list of steps (str) and executes it
+    """
+    return steps
 
 
-class Coder(BaseAgent):
-    def __init__(self, llm) -> None:
-        super().__init__(llm)
-        self.stop_string = "End Of Code."
-        self.input_key = "objective"
-        self.prompt_template = coder_prompt
-
-    def parse_output(self, result):
-        result = result.replace("End Of Code.", "")
-        result = remove_magic_commands(result)
-        return result
+def install_dependencies(deps: List[str]) -> List[str]:
+    """
+    takes the list of python dependencies as list of strings deps: List[str]
+    and installs them
+    """
+    return deps
 
 
-class CodeCorrector(BaseAgent):
-    def __init__(self, llm) -> None:
-        super().__init__(llm)
-        self.stop_string = "End Of Code"
-        self.input_key = "source_code"
-        self.prompt_template = code_corrector_prompt
-
-    def parse_output(self, result):
-        # Extract the thought
-        match_thought = re.search(r"Thought:(.*?)New Code:", result, re.DOTALL)
-        thought = (
-            match_thought.group(1).strip() if match_thought else "Thought not found."
-        )
-
-        print(thought)
-        # Extract the code
-        match_code = re.search(r"New Code:(.*?)End Of Code", result, re.DOTALL)
-        code = match_code.group(1).strip() if match_code else "Code not found."
-        code = extract_code_from_text(code)
-        code = remove_magic_commands(code)
-        # Print the thought and code
-        # print("Thought:\n", thought)
-        # print("\nCode:\n", code)
-        return code
+def execute_code(code: str):
+    """
+    Executes python code. Input is code: python code in the form of a string
+    """
+    code = extract_code_from_text(code)
+    code = remove_magic_commands(code)
+    return code
 
 
-class Planner(BaseAgent):
-    def __init__(self, llm) -> None:
-        super().__init__(llm)
-        self.stop_string = "End of planning flow."
-        self.input_key = "task"
-        self.prompt_template = planner_prompt
+planner_agent = OpenAIAgent(
+    model=agent_settings.planner_model,
+    system_prompt=planner_system_prompt,
+    user_prompt_template=planner_user_prompt_template,
+    functions=[execute_plan],
+)
+dependency_agent = OpenAIAgent(
+    model=agent_settings.dependency_model,
+    system_prompt=dependency_tracker_system_prompt,
+    user_prompt_template=dependency_tracker_user_prompt_template,
+    functions=[install_dependencies],
+)
+coding_agent = OpenAIAgent(
+    model=agent_settings.coder_model,
+    system_prompt=coder_system_prompt,
+    user_prompt_template=coder_user_prompt_template,
+    functions=[execute_code],
+)
+code_correcting_agent = OpenAIAgent(
+    model=agent_settings.code_corrector_model,
+    system_prompt=code_corrector_system_prompt,
+    user_prompt_template=code_corrector_user_prompt_template,
+    functions=[execute_code],
+)
 
-    def parse_output(self, steps):
-        if "Steps:" in steps:
-            steps = steps.split("Steps:")[1]
-        if "End of planning flow" in steps:
-            steps = steps.split("End of planning flow")[0]
-        # print(f"planner steps {steps}")
-        # print("----------")
+if __name__ == "__main__":
+    context = """
+    Read CSV Files
+    A simple way to store big data sets is to use CSV files (comma separated files).
 
-        # Split the string based on step numbers
-        split_steps = re.split(r"(\d+\.)", steps)
+    CSV files contains plain text and is a well know format that can be read by everyone including Pandas.
 
-        # Combine step numbers with step content and remove any empty strings
-        steps = [
-            split_steps[i] + split_steps[i + 1].strip()
-            for i in range(1, len(split_steps), 2)
-        ]
+    In our examples we will be using a CSV file called 'data.csv'.
 
-        return steps
+    Download data.csv. or Open data.csv
 
+    ExampleGet your own Python Server
+    Load the CSV into a DataFrame:
 
-class DependencyTracker(BaseAgent):
-    def __init__(self, llm) -> None:
-        super().__init__(llm)
-        self.stop_string = "end of planning flow"
-        self.input_key = "plan"
-        self.prompt_template = dependency_tracker_prompt
+    import pandas as pd
 
-    def parse_output(self, output):
-        output = output.lower()
-        # print(f"dependency tracker output {output}")
-        # print("----------")
-        if self.stop_string in output:
-            output = output.split(self.stop_string)[0]
-            # print (f'dependency tracker output {output}')
-            # print('----------')
-        return [step.split(".")[0] for step in output.split("\n") if len(step) > 0]
+    df = pd.read_csv('data.csv')
+
+    print(df.to_string())
+    """
+    task = "write code that reads a csv file using the pandas library"
+    plan = planner_agent.execute(
+        function_name="execute_plan",
+        context=context,
+        task=task,
+    )
+    # TODO: check that plan is not none
+    dependencies = dependency_agent.execute(
+        function_name="install_dependencies", plan=plan
+    )
+    code = coding_agent.execute(
+        function_name="execute_code",
+        task=task,
+        context=context,
+        plan=plan,
+        source_code="",
+    )
+    code = code_correcting_agent.execute(
+        function_name="execute_code",
+        task=task,
+        context=context,
+        source_code=code,
+        error="",
+    )
