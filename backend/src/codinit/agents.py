@@ -1,12 +1,15 @@
 import inspect
 import json
 import re
+import time
 from inspect import Parameter
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, Union
 
 import openai
 from openai import ChatCompletion
+from openai.error import RateLimitError
 from pydantic import create_model
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 from codinit.config import agent_settings, secrets
 from codinit.prompts import (
@@ -64,13 +67,16 @@ class OpenAIAgent:
             print(fc.arguments)
             return f(**json.loads(fc.arguments))
 
+    @retry(
+        wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3)
+    )
     def call_gpt(
         self,
         user_prompt: str,
         system_prompt: Optional[str] = None,
         functions=None,
         function_name: str = "",
-    ) -> OpenAIResponse:
+    ) -> Union[OpenAIResponse, Exception]:
         """
         Calls the GPT model and returns the completion.
 
@@ -91,17 +97,28 @@ class OpenAIAgent:
         # If there's a system prompt, insert it at the beginning of the messages list
         if system_prompt:
             messages.insert(0, {"role": "system", "content": system_prompt})
+        try:
+            # Call the ChatCompletion API to get the model's response and return the result
+            response = ChatCompletion.create(
+                model=self.model,
+                messages=messages,
+                functions=functions,
+                function_call={"name": function_name},
+            )
 
-        # Call the ChatCompletion API to get the model's response and return the result
-        response = ChatCompletion.create(
-            model=self.model,
-            messages=messages,
-            functions=functions,
-            function_call={"name": function_name},
-        )
-
-        # Convert the response to an OpenAIResponse object and return
-        return OpenAIResponse(**response)
+            # Convert the response to an OpenAIResponse object and return
+            return OpenAIResponse(**response)
+        except RateLimitError as e:
+            print("Rate limit reached, waiting to retry...")
+            print(f"Exception: {e}")
+            # TODO adjust this constant time to extract the wait time is reported in the exception
+            wait_time = 10
+            time.sleep(wait_time)
+            raise
+        except Exception as e:
+            print("Unable to generate ChatCompletion response")
+            print(f"Exception: {e}")
+            raise  # Re-raise the exception to trigger the retry mechanism
 
     def execute(self, function_name: str, **kwargs):
         user_prompt = self.user_prompt_template.format(**kwargs)
