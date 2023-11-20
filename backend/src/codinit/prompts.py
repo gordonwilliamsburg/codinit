@@ -272,8 +272,8 @@ DO NOT REPEAT THE SAME ERRORS AS THE SOURCE CODE! The source code is faulty! Mak
 
 The new code is a corrected version of the source code. And it must be complete! Make sure to complete your code!
 Incomplete code will not be accepted.
-The code shoud be a JSON compatible one-line string that contains python code. A one-line string!
-The code will be loaded using json.load(), so make sure that the string is json compatible!
+The code shoud be a one-line string that is JSON compatible that contains python code. A one-line string!
+The code will be loaded using json.load(), so make sure that the code string is json compatible!
 """
 code_corrector_user_prompt_template = """
 Context: {context}
