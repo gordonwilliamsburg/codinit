@@ -289,6 +289,18 @@ class TaskExecutor:
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
         )
+        # feed in lint results
+        print(f"{lint_result=}")
+        new_code = self.code_corrector.execute(
+            function_name="execute_code",
+            task=task,
+            context=relevant_docs,
+            source_code=new_code,
+            error=lint_result,
+        )
+        formatted_code, lint_result, metric = self.format_lint_code(
+            code=new_code, dependencies=deps
+        )
         # run generated code
         error = self.run_code(formatted_code)
         # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
