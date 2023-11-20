@@ -78,7 +78,8 @@ class OpenAIAgent:
         - user_prompt (str): The prompt provided by the user.
         - system_prompt (Optional[str]): An optional system prompt.
         - model (str): The GPT model version. Default is "gpt-3.5-turbo".
-        - **kwargs: Additional keyword arguments for the ChatCompletion.
+        - functions: list of function schemas
+        - function_name: name of the function to be called to force model to use function.
 
         Returns:
         - Any: The result from ChatCompletion.
