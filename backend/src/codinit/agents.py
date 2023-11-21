@@ -3,7 +3,7 @@ import json
 import re
 import time
 from inspect import Parameter
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import openai
 from openai import ChatCompletion
@@ -74,6 +74,7 @@ class OpenAIAgent:
         self,
         user_prompt: str,
         system_prompt: Optional[str] = None,
+        chat_history: List[Dict] = [],
         functions=None,
         function_name: str = "",
     ) -> Union[OpenAIResponse, Exception]:
@@ -90,13 +91,11 @@ class OpenAIAgent:
         Returns:
         - Any: The result from ChatCompletion.
         """
-
-        # Start by adding the user's message to the messages list
-        messages = [{"role": "user", "content": user_prompt}]
-
-        # If there's a system prompt, insert it at the beginning of the messages list
+        messages = chat_history
         if system_prompt:
-            messages.insert(0, {"role": "system", "content": system_prompt})
+            messages.append({"role": "system", "content": system_prompt})
+        # Start by adding the user's message to the messages list
+        messages.append({"role": "user", "content": user_prompt})
         try:
             # Call the ChatCompletion API to get the model's response and return the result
             response = ChatCompletion.create(
@@ -120,7 +119,7 @@ class OpenAIAgent:
             print(f"Exception: {e}")
             raise  # Re-raise the exception to trigger the retry mechanism
 
-    def execute(self, function_name: str, **kwargs):
+    def execute(self, function_name: str, chat_history: List[Dict] = [], **kwargs):
         user_prompt = self.user_prompt_template.format(**kwargs)
         function_schemas = [self.get_schema(function=func) for func in self.functions]
         gpt_response = self.call_gpt(
@@ -128,6 +127,7 @@ class OpenAIAgent:
             system_prompt=self.system_prompt,
             functions=function_schemas,
             function_name=function_name,
+            chat_history=chat_history,
         )
         # print(gpt_response)
         function_output = self.call_func(gpt_response)
