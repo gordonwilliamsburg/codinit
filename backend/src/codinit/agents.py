@@ -91,7 +91,8 @@ class OpenAIAgent:
         Returns:
         - Any: The result from ChatCompletion.
         """
-        messages = []
+        messages = chat_history
+        print(f"{messages=}")
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         # Start by adding the user's message to the messages list

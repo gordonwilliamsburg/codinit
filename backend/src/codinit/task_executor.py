@@ -253,7 +253,7 @@ class TaskExecutor:
         source_code: Optional[str] = None,
     ):
         attempt = 0
-        # chat_history = []
+        chat_history = []
         # Generating a coding plan
         retriever = WeaviateHybridSearchRetriever(
             client=client,
@@ -277,14 +277,14 @@ class TaskExecutor:
                 function_name="install_dependencies", plan=plan
             )
             self.install_dependencies(deps)
-        # chat_history.append(
-        #    {"role": "assistant", "content": f"installed dependencies {deps}"}
-        # )
+        chat_history.append(
+            {"role": "user", "content": f"installed dependencies {deps}"}
+        )
         # generate code
         new_code = self.coder.execute(
             task=task,
             function_name="execute_code",
-            # chat_history=chat_history,
+            chat_history=chat_history,
             source_code=self.code_editor.display_code(),
             plan=plan,
             context=relevant_docs,
