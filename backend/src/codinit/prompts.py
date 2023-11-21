@@ -237,6 +237,7 @@ Keep things simple. Define each code functionality separately. DO NOT NEST CODE!
 You should ALWAYS output the full code.
 Now please help with the subtask below.
 Make sure to call the "execute_code" function to run your code!!
+Do not install any dependencies! all dependencies have been installed already.
 """
 coder_user_prompt_template = """
 Task: {task}
@@ -271,6 +272,7 @@ DO NOT REPEAT THE SAME ERRORS AS THE SOURCE CODE! The source code is faulty! Mak
 The new code is a corrected version of the source code. And it must be complete! Make sure to complete your code!
 Incomplete code will not be accepted.
 
+Do not install any dependencies! all dependencies have been installed already.
 """
 code_corrector_user_prompt_template = """
 Context: {context}
