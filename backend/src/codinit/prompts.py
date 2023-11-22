@@ -240,9 +240,9 @@ Make sure to call the "execute_code" function to run your code!!
 Do not install any dependencies! all dependencies have been installed already.
 """
 coder_user_prompt_template = """
+Context: {context}
 Task: {task}
 Plan: {plan}
-Context: {context}
 Source Code: {source_code}
 """
 code_corrector_system_prompt = """You're an expert python code writing and correcting AI Agent.
