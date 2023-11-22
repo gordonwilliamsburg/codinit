@@ -55,6 +55,9 @@ def main():
 
         run_id = last_run_id + 1
         for task_id, task in enumerate(TASKS):
+            code_editor = PythonCodeEditor()
+            config = TaskExecutionConfig()
+            task_executor = TaskExecutor(code_editor, config)
             print("---------new_task-----------")
             task_executor.execute_and_log(
                 task=task,
