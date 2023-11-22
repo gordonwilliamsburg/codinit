@@ -281,7 +281,7 @@ class TaskExecutor:
             )
             self.install_dependencies(deps)
         chat_history.append(
-            {"role": "user", "content": f"installed dependencies {deps}"}
+            {"role": "assistant", "content": f"installed dependencies {deps}"}
         )
         # generate code
         new_code = self.coder.execute(
@@ -336,6 +336,7 @@ class TaskExecutor:
             # corrected code
             new_code = self.code_corrector.execute(
                 function_name="execute_code",
+                chat_history=[],
                 task=task,
                 context=relevant_docs,
                 source_code=new_code,
