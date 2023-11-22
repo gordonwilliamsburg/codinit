@@ -259,7 +259,7 @@ class TaskExecutor:
             client=client,
             index_name="DocumentionFile",
             text_key="content",
-            k=10,
+            k=5,
             alpha=0.75,
         )
         time_stamp = datetime.datetime.now().isoformat()
