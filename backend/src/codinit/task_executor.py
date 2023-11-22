@@ -268,13 +268,16 @@ class TaskExecutor:
         # relevant_docs = get_read_the_docs_context(task, k=10)
         # generate coding plan given context
         plan = self.planner.execute(
-            function_name="execute_plan", task=task, context=relevant_docs
+            function_name="execute_plan",
+            chat_history=[],
+            task=task,
+            context=relevant_docs,
         )
 
         # install dependencies from plan
         if self.config.execute_code and self.config.install_dependencies:
             deps = self.dependency_tracker.execute(
-                function_name="install_dependencies", plan=plan
+                function_name="install_dependencies", chat_history=[], plan=plan
             )
             self.install_dependencies(deps)
         chat_history.append(
@@ -297,6 +300,7 @@ class TaskExecutor:
         print(f"{lint_result=}")
         new_code = self.code_corrector.execute(
             function_name="execute_code",
+            chat_history=[],
             task=task,
             context=relevant_docs,
             source_code=new_code,
