@@ -288,7 +288,6 @@ class TaskExecutor:
             task=task,
             function_name="execute_code",
             chat_history=chat_history,
-            source_code=self.code_editor.display_code(),
             plan=plan,
             context=relevant_docs,
         )

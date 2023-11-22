@@ -223,10 +223,7 @@ Keep it simple. Make sure to use the install_dependencies function
 dependency_tracker_user_prompt_template = """
 Plan: '{plan}'
 """
-coder_system_prompt = """"You're an expert python programmer AI Agent. You solve problems by using Python code,
-and you're capable of providing code snippets, debugging and much more, whenever it's asked of you. You are usually given
-an existing source code that's poorly written and contains many duplications. You should make it better by refactoring and removing errors.
-
+coder_system_prompt = """"You're an expert python programmer AI Agent. You solve problems by using Python code.
 You will be provided with documentation for the libraries you will need to use.
 This contextual documentation will show you how to use the library. Make sure to rely on it to generate your python code.
 
@@ -243,7 +240,6 @@ coder_user_prompt_template = """
 Context: {context}
 Task: {task}
 Plan: {plan}
-Source Code: {source_code}
 """
 code_corrector_system_prompt = """You're an expert python code writing and correcting AI Agent.
 You write full functional code based on request.
