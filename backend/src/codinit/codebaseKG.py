@@ -1,11 +1,41 @@
 import os
+import time
 
 import libcst
+import openai
 import weaviate
 from langchain import LLMChain, PromptTemplate
 from langchain.chat_models import ChatOpenAI
-from openai.error import InvalidRequestError
+from openai import ChatCompletion
+from openai.error import InvalidRequestError, RateLimitError
 from weaviate.batch import Batch
+
+from codinit.config import client
+
+
+def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
+    messages = []
+    # Start by adding the user's message to the messages list
+    messages.append({"role": "user", "content": user_prompt})
+    try:
+        # Call the ChatCompletion API to get the model's response and return the result
+        response = ChatCompletion.create(
+            model=modelname,
+            messages=messages,
+        )
+        # Convert the response to an OpenAIResponse object and return
+        return response.choices[0].message.content
+    except RateLimitError as e:
+        print("Rate limit reached, waiting to retry...")
+        print(f"Exception: {e}")
+        # TODO adjust this constant time to extract the wait time is reported in the exception
+        wait_time = 10
+        time.sleep(wait_time)
+        raise
+    except Exception as e:
+        print("Unable to generate ChatCompletion response")
+        print(f"Exception: {e}")
+        raise  # Re-raise the exception to trigger the retry mechanism
 
 
 def file_already_exists(filename: str, link: str, client: weaviate.Client) -> bool:
@@ -94,7 +124,6 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
 
     # takes the Python source code (stored as a string in file_content) and parses it into an AST, which is stored in module.
     module = libcst.parse_module(file_content)
-    llm = ChatOpenAI(model="gpt-3.5-turbo-16k", temperature=0)
     # File entity
     file = {"name": file_name, "link": link}
     # Create file in Weaviate and get its id
@@ -115,11 +144,11 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                 module_name = get_full_name(node.module)
                 for name in node.names:
                     import_name = module_name + "." + get_full_name(name.name)
-                    print(f"visited import node {import_name}")
+                    # print(f"visited import node {import_name}")
                     import_obj = {
                         "name": import_name,
                     }
-                    print(f"{import_obj=}")
+                    # print(f"{import_obj=}")
                     # Create import in Weaviate and get its ID
                     import_id = batch.add_data_object(
                         data_object=import_obj, class_name="Import"
@@ -138,11 +167,11 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                 # Import entity
                 for name in node.names:
                     import_name = get_full_name(name.name)
-                    print(f"visited import node {import_name}")
+                    # print(f"visited import node {import_name}")
                     import_obj = {
                         "name": import_name,
                     }
-                    print(f"{import_obj=}")
+                    # print(f"{import_obj=}")
                     # Create import in Weaviate and get its ID
                     import_id = batch.add_data_object(
                         data_object=import_obj, class_name="Import"
@@ -169,28 +198,27 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
         elif isinstance(node, libcst.FunctionDef):
             # Function entity
             function_name = node.name.value
-            print(f"visited function node {function_name}")
+            # print(f"visited function node {function_name}")
             function_info = extract_function_info(node)
-            prompt_template = """You have the following python function with name: {function_name}, function info: {function_info},
+            description = ""
+            """
+            prompt_template = You have the following python function with name: {function_name}, function info: {function_info},
                 belongs to file: {file_name}.
                 What is the purpose of this function?
                 Write a description of the function given the provided information.
-                """
-            llm_chain = LLMChain(
-                llm=llm,
-                prompt=PromptTemplate.from_template(prompt_template),
-            )
-            description = llm_chain.predict(
+
+            function_prompt = prompt_template.format(
                 function_name=function_name,
                 function_info=function_info,
                 file_name=file_name,
-            )
+            )"""
+            # description = call_GPT(user_prompt=function_prompt)
             function_obj = {
                 **function_info,
                 "name": function_name,
                 "description": description,
             }
-            print(f"{function_obj=}")
+            # print(f"{function_obj=}")
             # Create function in Weaviate and get its ID
             function_id = batch.add_data_object(
                 data_object=function_obj, class_name="Function"
@@ -212,18 +240,18 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
             class_name = node.name.value
             print(f"visited class node {class_name}")
             class_attributes = extract_attributes(node)
-            class_code = libcst.Module([node]).code
+            # class_code = libcst.Module([node]).code
+            class_description = ""
             try:
-                prompt_template = """You have the following class named {class_name} with code {class_code} and belongs to file: {file_name}.
+                """
+                prompt_template = You have the following class named {class_name} with code {class_code} and belongs to file: {file_name}.
                     What is the purpose of this class?
                     Write a description of the class given the provided information.
-                    """
-                llm_chain = LLMChain(
-                    llm=llm, prompt=PromptTemplate.from_template(prompt_template)
-                )
-                class_description = llm_chain.predict(
+
+                class_prompt = prompt_template.format(
                     class_name=class_name, class_code=class_code, file_name=file_name
-                )
+                )"""
+                # class_description = call_GPT(user_prompt=class_prompt)
             except InvalidRequestError as e:
                 class_description = ""
                 print(e)
@@ -251,30 +279,29 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                 if isinstance(sub_node, libcst.FunctionDef):
                     # Function entity
                     function_name = sub_node.name.value
-                    print(f"visited function class node {function_name}")
+                    description = ""
+                    # print(f"visited function class node {function_name}")
                     try:
                         function_info = extract_function_info(sub_node)
-                        prompt_template = """You have the following python function with name: {function_name}, function info: {function_info},
+                        """
+                        prompt_template = You have the following python function with name: {function_name}, function info: {function_info},
                             belongs to class: {class_name}, belongs to file: {file_name}.
                             What is the purpose of this function?
                             Write a description of the function given the provided information.
-                            """
-                        llm_chain = LLMChain(
-                            llm=llm,
-                            prompt=PromptTemplate.from_template(prompt_template),
-                        )
-                        description = llm_chain.predict(
+
+                        function_prompt = prompt_template.format(
                             function_name=function_name,
-                            function_info=function_info,
                             class_name=class_name,
+                            function_info=function_info,
                             file_name=file_name,
-                        )
+                        )"""
+                        # description = call_GPT(user_prompt=function_prompt)
                         function_obj = {
                             "name": function_name,
                             "description": description,
                             **function_info,
                         }
-                        print(f"{function_obj=}")
+                        # print(f"{function_obj=}")
                         # Create function in Weaviate and get its ID
                         function_id = batch.add_data_object(
                             data_object=function_obj, class_name="Function"
@@ -339,9 +366,7 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
         weaviate_client.batch.configure(batch_size=20)
         with weaviate_client.batch as batch:
             for file in files:
-                if (
-                    file == "__init__.py"
-                ):  # .endswith(".py"):  # Process only Python files
+                if file.endswith(".py"):  # Process only Python files
                     print("---------")
                     file_path = os.path.join(root, file)
                     print(f"{file_path=}---------")
@@ -354,7 +379,7 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
                         file_id = parse_file(
                             file_content, file, file_path, batch
                         )  # Analyze the file and add its data to the weaviate db
-
+                        print(f"{file_id=}---------")
                         # Repository -> File relationship
                         batch.add_reference(
                             from_object_class_name="Repository",
@@ -365,3 +390,11 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
                         )
 
     return directory_id
+
+
+if __name__ == "__main__":
+    analyze_directory(
+        "/Users/zarroukinesrine/Desktop/Projects/LangChainRepos/langchain/libs/langchain/langchain",
+        "https://github.com/langchain-ai/langchain.git",
+        client,
+    )
