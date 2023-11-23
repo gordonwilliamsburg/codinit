@@ -4,10 +4,7 @@ import time
 import libcst
 import openai
 import weaviate
-from langchain import LLMChain, PromptTemplate
-from langchain.chat_models import ChatOpenAI
-from openai import ChatCompletion
-from openai.error import InvalidRequestError, RateLimitError
+from openai import RateLimitError
 from weaviate.batch import Batch
 
 from codinit.config import client
@@ -19,7 +16,7 @@ def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
     messages.append({"role": "user", "content": user_prompt})
     try:
         # Call the ChatCompletion API to get the model's response and return the result
-        response = ChatCompletion.create(
+        response = openai.chat.completions.create(
             model=modelname,
             messages=messages,
         )
@@ -252,7 +249,7 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                     class_name=class_name, class_code=class_code, file_name=file_name
                 )"""
                 # class_description = call_GPT(user_prompt=class_prompt)
-            except InvalidRequestError as e:
+            except Exception as e:
                 class_description = ""
                 print(e)
 

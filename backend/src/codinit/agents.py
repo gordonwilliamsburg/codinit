@@ -6,8 +6,7 @@ from inspect import Parameter
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import openai
-from openai import ChatCompletion
-from openai.error import RateLimitError
+from openai import RateLimitError
 from pydantic import create_model
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
@@ -22,7 +21,6 @@ from codinit.prompts import (
     planner_system_prompt,
     planner_user_prompt_template,
 )
-from codinit.pydantic_models import OpenAIResponse
 
 openai.api_key = secrets.openai_api_key
 
@@ -53,7 +51,7 @@ class OpenAIAgent:
         )
         return function_schema
 
-    def call_func(self, response: OpenAIResponse) -> Any:
+    def call_func(self, response: openai.chat.completions) -> Any:
         """
         Extract name and arguments of the function from the response from the OpenAI ChatCompletion API,
         Get the corresponding function from the current file,
@@ -77,7 +75,7 @@ class OpenAIAgent:
         chat_history: List[Dict] = [],
         functions=None,
         function_name: str = "",
-    ) -> Union[OpenAIResponse, Exception]:
+    ) -> Union[openai.chat.completions, Exception]:
         """
         Calls the GPT model and returns the completion.
 
@@ -99,15 +97,13 @@ class OpenAIAgent:
         messages.append({"role": "user", "content": user_prompt})
         try:
             # Call the ChatCompletion API to get the model's response and return the result
-            response = ChatCompletion.create(
+            response = openai.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 functions=functions,
                 function_call={"name": function_name},
             )
-
-            # Convert the response to an OpenAIResponse object and return
-            return OpenAIResponse(**response)
+            return response
         except RateLimitError as e:
             print("Rate limit reached, waiting to retry...")
             print(f"Exception: {e}")
