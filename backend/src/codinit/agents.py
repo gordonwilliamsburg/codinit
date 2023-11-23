@@ -102,6 +102,7 @@ class OpenAIAgent:
                 messages=messages,
                 functions=functions,
                 function_call={"name": function_name},
+                response_format={"type": "json_object"},
             )
             return response
         except RateLimitError as e:

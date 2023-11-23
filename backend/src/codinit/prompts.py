@@ -206,7 +206,8 @@ Now let's begin with a real task. Remember you should break it down into tractab
 If you plan to define functions, make sure to name them appropriately.
 If you plan to use libraries, make sure to say which ones exactly. BE PRECISE.
 Your output plan should NEVER modify an existing code, only add new code.
-Keep it simple, stupid
+Keep it simple, stupid.
+Make sure to return response in json format.
 """
 planner_user_prompt_template = """
 Task: '{task}'.
@@ -218,7 +219,8 @@ You will be given a task plan, please helps us find the necessary python package
 Do not try to install submodules or methods of a package, for example do not try to install requests.get.
 Also, please only install the non-standard python libraries!!
 Also remember, install only ONE library!!!
-Keep it simple. Make sure to use the install_dependencies function
+Keep it simple. Make sure to use the install_dependencies function.
+Make sure to return response in json format.
 """
 dependency_tracker_user_prompt_template = """
 Plan: '{plan}'
@@ -235,6 +237,7 @@ You should ALWAYS output the full code.
 Now please help with the subtask below.
 Make sure to call the "execute_code" function to run your code!!
 Do not install any dependencies! all dependencies have been installed already.
+Make sure to return response in json format.
 """
 coder_user_prompt_template = """
 Context: {context}
@@ -269,6 +272,7 @@ The new code is a corrected version of the source code. And it must be complete!
 Incomplete code will not be accepted.
 
 Do not install any dependencies! all dependencies have been installed already.
+Make sure to return response in json format.
 """
 code_corrector_user_prompt_template = """
 Context: {context}
