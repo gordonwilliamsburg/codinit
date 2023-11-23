@@ -98,6 +98,7 @@ class TaskExecutor:
 
         if dependencies:
             dependencies = list(set(dependencies))
+            dependencies += ["langchain", "pydantic", "openai", "wikipedia"]
             logger.info(f"{dependencies=}")
 
             for dependency in dependencies:
