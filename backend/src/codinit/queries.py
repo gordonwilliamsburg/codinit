@@ -1,4 +1,5 @@
-from typing import List
+import inspect
+from typing import Any, Callable, List
 
 import weaviate
 
@@ -25,6 +26,7 @@ def get_files(prompt: str, client: weaviate.Client = client, k=5):
 
 
 def get_classes(prompt: str, client: weaviate.Client = client, k=5):
+    """Returns code classes relevant for a given prompt"""
     result = (
         client.query.get(
             "Class",
@@ -38,6 +40,7 @@ def get_classes(prompt: str, client: weaviate.Client = client, k=5):
 
 
 def get_imports(prompt: str, client: weaviate.Client = client, k=5):
+    """Returns code imports relevant for a given prompt"""
     result = (
         client.query.get(
             "Import",
@@ -51,6 +54,7 @@ def get_imports(prompt: str, client: weaviate.Client = client, k=5):
 
 
 def get_exact_imports(query: str, client: weaviate.Client = client, k=5):
+    """Returns exact imports relevant for a given prompt"""
     result = (
         client.query.get(
             "Import",
@@ -73,7 +77,8 @@ def get_imports_from_kg(
     return result
 
 
-def get_functions(prompt: str, client: weaviate.Client, k=5):
+def get_functions(prompt: str, client: weaviate.Client = client, k=5):
+    """Returns code functions relevant for a given prompt"""
     result = (
         client.query.get(
             "Function",
