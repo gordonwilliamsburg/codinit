@@ -1,12 +1,9 @@
-import inspect
-from typing import Any, Callable, List
-
-import weaviate
+from typing import List
 
 from codinit.config import client
 
 
-def get_files(prompt: str, client: weaviate.Client = client, k=5):
+def get_files(prompt: str, k=5):
     """Returns code file relevant for a given prompt"""
     result = (
         client.query.get(
@@ -25,7 +22,7 @@ def get_files(prompt: str, client: weaviate.Client = client, k=5):
     return result["data"]["Get"]["File"]
 
 
-def get_classes(prompt: str, client: weaviate.Client = client, k=5):
+def get_classes(prompt: str, k=5):
     """Returns code classes relevant for a given prompt"""
     result = (
         client.query.get(
@@ -39,7 +36,7 @@ def get_classes(prompt: str, client: weaviate.Client = client, k=5):
     return result["data"]["Get"]["Class"]
 
 
-def get_imports(prompt: str, client: weaviate.Client = client, k=5):
+def get_imports(prompt: str, k=5):
     """Returns code imports relevant for a given prompt"""
     result = (
         client.query.get(
@@ -53,7 +50,7 @@ def get_imports(prompt: str, client: weaviate.Client = client, k=5):
     return result["data"]["Get"]["Import"]
 
 
-def get_exact_imports(query: str, client: weaviate.Client = client, k=5):
+def get_exact_imports(query: str, k=5):
     """Returns exact imports relevant for a given prompt"""
     result = (
         client.query.get(
@@ -67,17 +64,15 @@ def get_exact_imports(query: str, client: weaviate.Client = client, k=5):
     return result["data"]["Get"]["Import"]
 
 
-def get_imports_from_kg(
-    import_list: List[str], library_name: str, client: weaviate.Client = client, k=10
-):
+def get_imports_from_kg(import_list: List[str], library_name: str, k=10):
     result = {}
     for import_name in import_list:
-        exists_in_weaviate_kg = get_exact_imports(query=import_name, client=client, k=k)
+        exists_in_weaviate_kg = get_exact_imports(query=import_name, k=k)
         result[import_name] = exists_in_weaviate_kg
     return result
 
 
-def get_functions(prompt: str, client: weaviate.Client = client, k=5):
+def get_functions(prompt: str, k=5):
     """Returns code functions relevant for a given prompt"""
     result = (
         client.query.get(
