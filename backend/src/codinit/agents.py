@@ -63,6 +63,8 @@ class OpenAIAgent:
         then call the function with extracted arguments.
         """
         function_name = tool_call.function.name
+        if function_name not in self.func_names:
+            return print(f"Not allowed: {tool_call.name}")
         function_args = json.loads(tool_call.function.arguments)
         function_response = globals()[function_name](**function_args)
         return function_response
@@ -139,14 +141,20 @@ class OpenAIAgent:
         tool_calls = gpt_response.choices[0].message.tool_calls
         print(tool_calls)
         # TODO handle having multiple functions vs. one single function
+        tool_outputs = []
         if tool_calls:
             for tool_call in tool_calls:
-                if tool_call.function.name not in self.func_names:
-                    return print(f"Not allowed: {tool_call.name}")
-                else:
-                    tool_output = self.call_func(tool_call)
-                    return tool_output
-            # print(function_output)
+                tool_output = self.call_func(tool_call)
+                tool_outputs.append(
+                    dict(
+                        tool_call_id=tool_call.id,
+                        role="tool",
+                        name=tool_call.function.name,
+                        content=json.dumps(tool_output),
+                    )
+                )
+        return tool_outputs
+        # print(function_output)
 
 
 def extract_code_from_text(text):
@@ -249,22 +257,22 @@ if __name__ == "__main__":
         function_name="execute_plan",
         context=context,
         task=task,
-    )
+    )[0]["content"]
     # TODO: check that plan is not none
     dependencies = dependency_agent.execute(
         function_name="install_dependencies", plan=plan
-    )
+    )[0]["content"]
     code = coding_agent.execute(
         function_name="execute_code",
         task=task,
         context=context,
         plan=plan,
         source_code="",
-    )
+    )[0]["content"]
     code = code_correcting_agent.execute(
         function_name="execute_code",
         task=task,
         context=context,
         source_code=code,
         error="",
-    )
+    )[0]["content"]

@@ -273,13 +273,13 @@ class TaskExecutor:
             chat_history=[],
             task=task,
             context=relevant_docs,
-        )
+        )[0]["content"]
 
         # install dependencies from plan
         if self.config.execute_code and self.config.install_dependencies:
             deps = self.dependency_tracker.execute(
                 function_name="install_dependencies", chat_history=[], plan=plan
-            )
+            )[0]["content"]
             self.install_dependencies(deps)
         chat_history.append(
             {"role": "assistant", "content": f"installed dependencies {deps}"}
@@ -291,7 +291,7 @@ class TaskExecutor:
             chat_history=chat_history,
             plan=plan,
             context=relevant_docs,
-        )
+        )[0]["content"]
         new_code = self.format_code(code=new_code, dependencies=deps)
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
@@ -305,7 +305,7 @@ class TaskExecutor:
             context=relevant_docs,
             source_code=new_code,
             error=lint_result,
-        )
+        )[0]["content"]
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
         )
@@ -342,7 +342,7 @@ class TaskExecutor:
                 context=relevant_docs,
                 source_code=new_code,
                 error=error,
-            )
+            )[0]["content"]
             formatted_code, lint_result, metric = self.format_lint_code(
                 code=new_code, dependencies=deps
             )
