@@ -47,23 +47,25 @@ class OpenAIAgent:
         }
         parameters = create_model(f"Input for `{function.__name__}`", **kw).schema()
         function_schema = dict(
-            name=function.__name__, description=function.__doc__, parameters=parameters
+            type="function",
+            function=dict(
+                name=function.__name__,
+                description=function.__doc__,
+                parameters=parameters,
+            ),
         )
         return function_schema
 
-    def call_func(self, response: openai.chat.completions) -> Any:
+    def call_func(self, tool_call) -> Any:
         """
         Extract name and arguments of the function from the response from the OpenAI ChatCompletion API,
         Get the corresponding function from the current file,
         then call the function with extracted arguments.
         """
-        fc = response.choices[0].message.function_call
-        if fc and fc.name not in self.func_names:
-            return print(f"Not allowed: {fc.name}")
-        if fc:
-            f = globals()[fc.name]
-            print(fc.arguments)
-            return f(**json.loads(fc.arguments))
+        function_name = tool_call.function.name
+        function_args = json.loads(tool_call.function.arguments)
+        function_response = globals()[function_name](**function_args)
+        return function_response
 
     @retry(
         wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3)
@@ -75,6 +77,7 @@ class OpenAIAgent:
         chat_history: List[Dict] = [],
         functions=None,
         function_name: str = "",
+        **kwargs,
     ) -> Union[openai.chat.completions, Exception]:
         """
         Calls the GPT model and returns the completion.
@@ -100,9 +103,10 @@ class OpenAIAgent:
             response = openai.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                functions=functions,
-                function_call={"name": function_name},
+                tools=functions,
+                tool_choice="auto",  # {"name": function_name},
                 response_format={"type": "json_object"},
+                **kwargs,
             )
             return response
         except RateLimitError as e:
@@ -128,9 +132,17 @@ class OpenAIAgent:
             chat_history=chat_history,
         )
         # print(gpt_response)
-        function_output = self.call_func(gpt_response)
-        # print(function_output)
-        return function_output
+        tool_calls = gpt_response.choices[0].message.tool_calls
+        print(tool_calls)
+        # TODO handle having multiple functions vs. one single function
+        if tool_calls:
+            for tool_call in tool_calls:
+                if tool_call.function.name not in self.func_names:
+                    return print(f"Not allowed: {tool_call.name}")
+                else:
+                    tool_output = self.call_func(tool_call)
+                    return tool_output
+            # print(function_output)
 
 
 def extract_code_from_text(text):
