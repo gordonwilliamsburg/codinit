@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-
+"""
 # Represents the usage statistics for the completion request.
 class Usage(BaseModel):
     prompt_tokens: int  # Number of tokens in the prompt.
@@ -32,7 +32,7 @@ class Choice(BaseModel):
     finish_reason: str  # The reason the model stopped generating tokens (e.g., "stop", "function_call").
 
 
-"""
+
 ChatCompletion Response has the following hierarchy:
 OpenAIResponse
 ├── id: string
@@ -54,7 +54,6 @@ OpenAIResponse
     ├── prompt_tokens: integer
     ├── completion_tokens: integer
     └── total_tokens: integer
-"""
 
 
 # Represents the chat completion response returned by the model.
@@ -65,3 +64,4 @@ class OpenAIResponse(BaseModel):
     model: str  # The model used for the chat completion.
     choices: List[Choice]  # A list of chat completion choices.
     usage: Usage  # Usage statistics for the completion request.
+"""

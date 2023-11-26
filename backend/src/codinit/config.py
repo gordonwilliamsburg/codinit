@@ -55,6 +55,7 @@ class AgentSettings(BaseSettings):
     dependency_model: str
     coder_model: str
     code_corrector_model: str
+    linter_model: str
 
 
 class EvalSettings(BaseSettings):

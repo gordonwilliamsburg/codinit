@@ -1,12 +1,14 @@
 import inspect
 import json
 import re
+import time
 from inspect import Parameter
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import openai
-from openai import ChatCompletion
+from openai import RateLimitError
 from pydantic import create_model
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 from codinit.config import agent_settings, secrets
 from codinit.prompts import (
@@ -16,10 +18,12 @@ from codinit.prompts import (
     coder_user_prompt_template,
     dependency_tracker_system_prompt,
     dependency_tracker_user_prompt_template,
+    linter_system_prompt,
+    linter_user_prompt_template,
     planner_system_prompt,
     planner_user_prompt_template,
 )
-from codinit.pydantic_models import OpenAIResponse
+from codinit.queries import get_classes, get_files, get_functions, get_imports
 
 openai.api_key = secrets.openai_api_key
 
@@ -37,6 +41,7 @@ class OpenAIAgent:
         self.func_names = [func.__name__ for func in self.functions]
         self.system_prompt = system_prompt
         self.user_prompt_template = user_prompt_template
+        self.messages = [{"role": "system", "content": system_prompt}]
 
     def get_schema(self, function: Callable[..., Any]):
         # function to extract schema of a function from the function code
@@ -46,31 +51,39 @@ class OpenAIAgent:
         }
         parameters = create_model(f"Input for `{function.__name__}`", **kw).schema()
         function_schema = dict(
-            name=function.__name__, description=function.__doc__, parameters=parameters
+            type="function",
+            function=dict(
+                name=function.__name__,
+                description=function.__doc__,
+                parameters=parameters,
+            ),
         )
         return function_schema
 
-    def call_func(self, response: OpenAIResponse) -> Any:
+    def call_func(self, tool_call) -> Any:
         """
         Extract name and arguments of the function from the response from the OpenAI ChatCompletion API,
         Get the corresponding function from the current file,
         then call the function with extracted arguments.
         """
-        fc = response.choices[0].message.function_call
-        if fc and fc.name not in self.func_names:
-            return print(f"Not allowed: {fc.name}")
-        if fc:
-            f = globals()[fc.name]
-            print(fc.arguments)
-            return f(**json.loads(fc.arguments))
+        function_name = tool_call.function.name
+        if function_name not in self.func_names:
+            return print(f"Not allowed: {tool_call.name}")
+        function_args = json.loads(tool_call.function.arguments)
+        function_response = globals()[function_name](**function_args)
+        return function_response
 
+    @retry(
+        wait=wait_random_exponential(multiplier=1, max=40), stop=stop_after_attempt(3)
+    )
     def call_gpt(
         self,
         user_prompt: str,
-        system_prompt: Optional[str] = None,
-        functions=None,
-        function_name: str = "",
-    ) -> OpenAIResponse:
+        chat_history: List[Dict] = [],
+        tools=None,
+        tool_choice: Optional[str] = None,
+        **kwargs,
+    ) -> Union[openai.chat.completions, Exception]:
         """
         Calls the GPT model and returns the completion.
 
@@ -79,43 +92,74 @@ class OpenAIAgent:
         - system_prompt (Optional[str]): An optional system prompt.
         - model (str): The GPT model version. Default is "gpt-3.5-turbo".
         - functions: list of function schemas
-        - function_name: name of the function to be called to force model to use function.
+        - tool_choice: name of the function to be called to force model to use function.
 
         Returns:
         - Any: The result from ChatCompletion.
         """
-
+        if len(chat_history) > 0:
+            self.messages += chat_history
+        # print(f"{messages=}")
         # Start by adding the user's message to the messages list
-        messages = [{"role": "user", "content": user_prompt}]
+        self.messages.append({"role": "user", "content": user_prompt})
+        if tool_choice:
+            choice = {"type": "function", "function": {"name": tool_choice}}
+        else:
+            choice = "auto"  # type: ignore
+        try:
+            # Call the ChatCompletion API to get the model's response and return the result
+            response = openai.chat.completions.create(
+                model=self.model,
+                messages=self.messages,
+                tools=tools,
+                tool_choice=choice,
+                response_format={"type": "json_object"},
+                **kwargs,
+            )
+            return response
+        except RateLimitError as e:
+            print("Rate limit reached, waiting to retry...")
+            print(f"Exception: {e}")
+            # TODO adjust this constant time to extract the wait time is reported in the exception
+            wait_time = 10
+            time.sleep(wait_time)
+            raise
+        except Exception as e:
+            print("Unable to generate ChatCompletion response")
+            print(f"Exception: {e}")
+            raise  # Re-raise the exception to trigger the retry mechanism
 
-        # If there's a system prompt, insert it at the beginning of the messages list
-        if system_prompt:
-            messages.insert(0, {"role": "system", "content": system_prompt})
-
-        # Call the ChatCompletion API to get the model's response and return the result
-        response = ChatCompletion.create(
-            model=self.model,
-            messages=messages,
-            functions=functions,
-            function_call={"name": function_name},
-        )
-
-        # Convert the response to an OpenAIResponse object and return
-        return OpenAIResponse(**response)
-
-    def execute(self, function_name: str, **kwargs):
+    def execute(
+        self, tool_choice: Optional[str] = None, chat_history: List[Dict] = [], **kwargs
+    ):
         user_prompt = self.user_prompt_template.format(**kwargs)
         function_schemas = [self.get_schema(function=func) for func in self.functions]
         gpt_response = self.call_gpt(
             user_prompt=user_prompt,
-            system_prompt=self.system_prompt,
-            functions=function_schemas,
-            function_name=function_name,
+            tools=function_schemas,
+            tool_choice=tool_choice,
+            chat_history=chat_history,
         )
+        self.messages.append(gpt_response.choices[0].message)
         # print(gpt_response)
-        function_output = self.call_func(gpt_response)
+        tool_calls = gpt_response.choices[0].message.tool_calls
+        print(tool_calls)
+        # TODO handle having multiple functions vs. one single function
+        tool_outputs = []
+        if tool_calls:
+            for tool_call in tool_calls:
+                tool_output = self.call_func(tool_call)
+                tool_outputs.append(tool_output)
+                self.messages.append(
+                    dict(
+                        tool_call_id=tool_call.id,
+                        role="tool",
+                        name=tool_call.function.name,
+                        content=json.dumps(tool_output),
+                    )
+                )
+        return tool_outputs
         # print(function_output)
-        return function_output
 
 
 def extract_code_from_text(text):
@@ -164,35 +208,40 @@ def execute_code(thought: str, code: str):
     """
     code = extract_code_from_text(code)
     code = remove_magic_commands(code)
-    print(code)
+    # print(code)
     return code
 
 
 planner_agent = OpenAIAgent(
-    model=agent_settings.planner_model,
+    model="gpt-3.5-turbo-1106",  # agent_settings.planner_model,
     system_prompt=planner_system_prompt,
     user_prompt_template=planner_user_prompt_template,
     functions=[execute_plan],
 )
 dependency_agent = OpenAIAgent(
-    model=agent_settings.dependency_model,
+    model="gpt-3.5-turbo-1106",  # agent_settings.dependency_model,
     system_prompt=dependency_tracker_system_prompt,
     user_prompt_template=dependency_tracker_user_prompt_template,
     functions=[install_dependencies],
 )
 coding_agent = OpenAIAgent(
-    model=agent_settings.coder_model,
+    model="gpt-3.5-turbo-1106",  # agent_settings.coder_model,
     system_prompt=coder_system_prompt,
     user_prompt_template=coder_user_prompt_template,
     functions=[execute_code],
 )
 code_correcting_agent = OpenAIAgent(
-    model=agent_settings.code_corrector_model,
+    model="gpt-3.5-turbo-1106",  # agent_settings.code_corrector_model,
     system_prompt=code_corrector_system_prompt,
     user_prompt_template=code_corrector_user_prompt_template,
     functions=[execute_code],
 )
-
+linting_agent = OpenAIAgent(
+    model="gpt-3.5-turbo-1106",  # agent_settings.linter_model,
+    system_prompt=linter_system_prompt,
+    user_prompt_template=linter_user_prompt_template,
+    functions=[get_classes, get_functions, get_imports, get_files],
+)
 if __name__ == "__main__":
     context = """
     Read CSV Files
@@ -215,25 +264,26 @@ if __name__ == "__main__":
     """
     task = "write code that reads a csv file using the pandas library"
     plan = planner_agent.execute(
-        function_name="execute_plan",
+        tool_choice="execute_plan",
         context=context,
         task=task,
-    )
+    )[0]
     # TODO: check that plan is not none
     dependencies = dependency_agent.execute(
-        function_name="install_dependencies", plan=plan
-    )
+        tool_choice="install_dependencies", plan=plan
+    )[0]
     code = coding_agent.execute(
-        function_name="execute_code",
+        tool_choice="execute_code",
         task=task,
         context=context,
         plan=plan,
         source_code="",
-    )
+    )[0]
     code = code_correcting_agent.execute(
-        function_name="execute_code",
+        tool_choice="execute_code",
         task=task,
         context=context,
         source_code=code,
         error="",
-    )
+    )[0]
+    print(code)
