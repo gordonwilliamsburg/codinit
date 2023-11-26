@@ -210,14 +210,12 @@ class TaskExecutor:
             chat_history=[],
             task=task,
             context=relevant_docs,
-        )[0]["content"]
-        plan = json.loads(plan)
+        )[0]
         # install dependencies from plan
         if self.config.execute_code and self.config.install_dependencies:
             deps = self.dependency_tracker.execute(
                 tool_choice="install_dependencies", chat_history=[], plan=plan
-            )[0]["content"]
-            deps = json.loads(deps)
+            )[0]
             self.install_dependencies(deps)
         chat_history.append(
             {"role": "assistant", "content": f"installed dependencies {deps}"}
@@ -229,8 +227,7 @@ class TaskExecutor:
             chat_history=chat_history,
             plan=plan,
             context=relevant_docs,
-        )[0]["content"]
-        new_code = json.loads(new_code)
+        )[0]
         new_code = self.format_code(code=new_code, dependencies=deps)
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
@@ -238,11 +235,12 @@ class TaskExecutor:
         # feed in lint results
         print(f"{lint_result=}")
         lint_query_results = self.linter.execute(
-            tool_choice="auto", source_code=new_code, linter_output=lint_result
+            source_code=new_code, linter_output=lint_result
         )
+        print(lint_query_results)
         lint_response = openai.chat.completions.create(
             model="gpt-3.5-turbo-1106",
-            messages=lint_query_results,
+            messages=self.linter.messages,
         )
         print(f"{lint_response=}")
         new_code = self.code_corrector.execute(
@@ -252,8 +250,7 @@ class TaskExecutor:
             context=relevant_docs,
             source_code=new_code,
             error=lint_response,
-        )[0]["content"]
-        new_code = json.loads(new_code)
+        )[0]
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
         )
@@ -290,8 +287,7 @@ class TaskExecutor:
                 context=relevant_docs,
                 source_code=new_code,
                 error=error,
-            )[0]["content"]
-            new_code = json.loads(new_code)
+            )[0]
             formatted_code, lint_result, metric = self.format_lint_code(
                 code=new_code, dependencies=deps
             )

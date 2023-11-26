@@ -284,6 +284,7 @@ Error: {error}
 linter_system_prompt = """
 You will receive python code and corresponding errors from linter.
 Your job is to fix these errors by querying the library which the code is using, leveraging query tools that you will receive.
+Make sure to return response in json format.
 """
 linter_user_prompt_template = """
 Source Code: {source_code}

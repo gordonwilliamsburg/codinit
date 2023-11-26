@@ -41,6 +41,7 @@ class OpenAIAgent:
         self.func_names = [func.__name__ for func in self.functions]
         self.system_prompt = system_prompt
         self.user_prompt_template = user_prompt_template
+        self.messages = [{"role": "system", "content": system_prompt}]
 
     def get_schema(self, function: Callable[..., Any]):
         # function to extract schema of a function from the function code
@@ -78,7 +79,6 @@ class OpenAIAgent:
     def call_gpt(
         self,
         user_prompt: str,
-        system_prompt: Optional[str] = None,
         chat_history: List[Dict] = [],
         tools=None,
         tool_choice: Optional[str] = None,
@@ -97,12 +97,11 @@ class OpenAIAgent:
         Returns:
         - Any: The result from ChatCompletion.
         """
-        messages = chat_history
+        if len(chat_history) > 0:
+            self.messages += chat_history
         # print(f"{messages=}")
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
         # Start by adding the user's message to the messages list
-        messages.append({"role": "user", "content": user_prompt})
+        self.messages.append({"role": "user", "content": user_prompt})
         if tool_choice:
             choice = {"type": "function", "function": {"name": tool_choice}}
         else:
@@ -111,7 +110,7 @@ class OpenAIAgent:
             # Call the ChatCompletion API to get the model's response and return the result
             response = openai.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=self.messages,
                 tools=tools,
                 tool_choice=choice,
                 response_format={"type": "json_object"},
@@ -130,16 +129,18 @@ class OpenAIAgent:
             print(f"Exception: {e}")
             raise  # Re-raise the exception to trigger the retry mechanism
 
-    def execute(self, tool_choice: str, chat_history: List[Dict] = [], **kwargs):
+    def execute(
+        self, tool_choice: Optional[str] = None, chat_history: List[Dict] = [], **kwargs
+    ):
         user_prompt = self.user_prompt_template.format(**kwargs)
         function_schemas = [self.get_schema(function=func) for func in self.functions]
         gpt_response = self.call_gpt(
             user_prompt=user_prompt,
-            system_prompt=self.system_prompt,
             tools=function_schemas,
             tool_choice=tool_choice,
             chat_history=chat_history,
         )
+        self.messages.append(gpt_response.choices[0].message)
         # print(gpt_response)
         tool_calls = gpt_response.choices[0].message.tool_calls
         print(tool_calls)
@@ -148,7 +149,8 @@ class OpenAIAgent:
         if tool_calls:
             for tool_call in tool_calls:
                 tool_output = self.call_func(tool_call)
-                tool_outputs.append(
+                tool_outputs.append(tool_output)
+                self.messages.append(
                     dict(
                         tool_call_id=tool_call.id,
                         role="tool",
@@ -265,23 +267,23 @@ if __name__ == "__main__":
         tool_choice="execute_plan",
         context=context,
         task=task,
-    )[0]["content"]
+    )[0]
     # TODO: check that plan is not none
     dependencies = dependency_agent.execute(
         tool_choice="install_dependencies", plan=plan
-    )[0]["content"]
+    )[0]
     code = coding_agent.execute(
         tool_choice="execute_code",
         task=task,
         context=context,
         plan=plan,
         source_code="",
-    )[0]["content"]
+    )[0]
     code = code_correcting_agent.execute(
         tool_choice="execute_code",
         task=task,
         context=context,
         source_code=code,
         error="",
-    )[0]["content"]
-    print(json.loads(code))
+    )[0]
+    print(code)
