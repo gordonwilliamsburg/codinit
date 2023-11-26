@@ -75,8 +75,8 @@ class OpenAIAgent:
         user_prompt: str,
         system_prompt: Optional[str] = None,
         chat_history: List[Dict] = [],
-        functions=None,
-        function_name: str = "",
+        tools=None,
+        tool_choice: Optional[str] = None,
         **kwargs,
     ) -> Union[openai.chat.completions, Exception]:
         """
@@ -87,7 +87,7 @@ class OpenAIAgent:
         - system_prompt (Optional[str]): An optional system prompt.
         - model (str): The GPT model version. Default is "gpt-3.5-turbo".
         - functions: list of function schemas
-        - function_name: name of the function to be called to force model to use function.
+        - tool_choice: name of the function to be called to force model to use function.
 
         Returns:
         - Any: The result from ChatCompletion.
@@ -98,13 +98,17 @@ class OpenAIAgent:
             messages.append({"role": "system", "content": system_prompt})
         # Start by adding the user's message to the messages list
         messages.append({"role": "user", "content": user_prompt})
+        if tool_choice:
+            choice = {"type": "function", "function": {"name": tool_choice}}
+        else:
+            choice = "auto"  # type: ignore
         try:
             # Call the ChatCompletion API to get the model's response and return the result
             response = openai.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                tools=functions,
-                tool_choice="auto",  # {"name": function_name},
+                tools=tools,
+                tool_choice=choice,
                 response_format={"type": "json_object"},
                 **kwargs,
             )
@@ -127,8 +131,8 @@ class OpenAIAgent:
         gpt_response = self.call_gpt(
             user_prompt=user_prompt,
             system_prompt=self.system_prompt,
-            functions=function_schemas,
-            function_name=function_name,
+            tools=function_schemas,
+            tool_choice=function_name,
             chat_history=chat_history,
         )
         # print(gpt_response)
