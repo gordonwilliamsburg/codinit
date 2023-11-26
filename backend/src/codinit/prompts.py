@@ -280,3 +280,12 @@ Task: {task}
 Source Code: {source_code}
 Error: {error}
 """
+
+linter_system_prompt = """
+You will receive python code and corresponding errors from linter.
+Your job is to fix these errors by querying the library which the code is using, leveraging query tools that you will receive.
+"""
+linter_user_prompt_template = """
+Source Code: {source_code}
+Linting Errors: {linter_output}
+"""

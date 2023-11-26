@@ -18,9 +18,12 @@ from codinit.prompts import (
     coder_user_prompt_template,
     dependency_tracker_system_prompt,
     dependency_tracker_user_prompt_template,
+    linter_system_prompt,
+    linter_user_prompt_template,
     planner_system_prompt,
     planner_user_prompt_template,
 )
+from codinit.queries import get_classes, get_files, get_functions, get_imports
 
 openai.api_key = secrets.openai_api_key
 
@@ -95,7 +98,7 @@ class OpenAIAgent:
         - Any: The result from ChatCompletion.
         """
         messages = chat_history
-        print(f"{messages=}")
+        # print(f"{messages=}")
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         # Start by adding the user's message to the messages list
@@ -127,14 +130,14 @@ class OpenAIAgent:
             print(f"Exception: {e}")
             raise  # Re-raise the exception to trigger the retry mechanism
 
-    def execute(self, function_name: str, chat_history: List[Dict] = [], **kwargs):
+    def execute(self, tool_choice: str, chat_history: List[Dict] = [], **kwargs):
         user_prompt = self.user_prompt_template.format(**kwargs)
         function_schemas = [self.get_schema(function=func) for func in self.functions]
         gpt_response = self.call_gpt(
             user_prompt=user_prompt,
             system_prompt=self.system_prompt,
             tools=function_schemas,
-            tool_choice=function_name,
+            tool_choice=tool_choice,
             chat_history=chat_history,
         )
         # print(gpt_response)
@@ -203,35 +206,40 @@ def execute_code(thought: str, code: str):
     """
     code = extract_code_from_text(code)
     code = remove_magic_commands(code)
-    print(code)
+    # print(code)
     return code
 
 
 planner_agent = OpenAIAgent(
-    model=agent_settings.planner_model,
+    model="gpt-3.5-turbo-1106",  # agent_settings.planner_model,
     system_prompt=planner_system_prompt,
     user_prompt_template=planner_user_prompt_template,
     functions=[execute_plan],
 )
 dependency_agent = OpenAIAgent(
-    model=agent_settings.dependency_model,
+    model="gpt-3.5-turbo-1106",  # agent_settings.dependency_model,
     system_prompt=dependency_tracker_system_prompt,
     user_prompt_template=dependency_tracker_user_prompt_template,
     functions=[install_dependencies],
 )
 coding_agent = OpenAIAgent(
-    model=agent_settings.coder_model,
+    model="gpt-3.5-turbo-1106",  # agent_settings.coder_model,
     system_prompt=coder_system_prompt,
     user_prompt_template=coder_user_prompt_template,
     functions=[execute_code],
 )
 code_correcting_agent = OpenAIAgent(
-    model=agent_settings.code_corrector_model,
+    model="gpt-3.5-turbo-1106",  # agent_settings.code_corrector_model,
     system_prompt=code_corrector_system_prompt,
     user_prompt_template=code_corrector_user_prompt_template,
     functions=[execute_code],
 )
-
+linting_agent = OpenAIAgent(
+    model="gpt-3.5-turbo-1106",  # agent_settings.linter_model,
+    system_prompt=linter_system_prompt,
+    user_prompt_template=linter_user_prompt_template,
+    functions=[get_classes, get_functions, get_imports, get_files],
+)
 if __name__ == "__main__":
     context = """
     Read CSV Files
@@ -254,25 +262,26 @@ if __name__ == "__main__":
     """
     task = "write code that reads a csv file using the pandas library"
     plan = planner_agent.execute(
-        function_name="execute_plan",
+        tool_choice="execute_plan",
         context=context,
         task=task,
     )[0]["content"]
     # TODO: check that plan is not none
     dependencies = dependency_agent.execute(
-        function_name="install_dependencies", plan=plan
+        tool_choice="install_dependencies", plan=plan
     )[0]["content"]
     code = coding_agent.execute(
-        function_name="execute_code",
+        tool_choice="execute_code",
         task=task,
         context=context,
         plan=plan,
         source_code="",
     )[0]["content"]
     code = code_correcting_agent.execute(
-        function_name="execute_code",
+        tool_choice="execute_code",
         task=task,
         context=context,
         source_code=code,
         error="",
     )[0]["content"]
+    print(json.loads(code))

@@ -2,3 +2,4 @@ planner_model: gpt-4-1106-preview #gpt-3.5-turbo
 dependency_model: gpt-4-1106-preview #gpt-3.5-turbo
 coder_model: gpt-4-1106-preview #gpt-3.5-turbo
 code_corrector_model: gpt-4-1106-preview #gpt-3.5-turbo
+linter_model: gpt-3.5-turbo-1106

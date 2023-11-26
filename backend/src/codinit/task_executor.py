@@ -1,10 +1,12 @@
 import ast
 import datetime
+import json
 import logging
 from csv import DictWriter
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+import openai
 import requests
 from langchain.chat_models import ChatOpenAI
 from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
@@ -13,6 +15,7 @@ from codinit.agents import (
     code_correcting_agent,
     coding_agent,
     dependency_agent,
+    linting_agent,
     planner_agent,
 )
 from codinit.code_editor import PythonCodeEditor
@@ -70,6 +73,9 @@ class TaskExecutor:
 
         # Code corrector
         self.code_corrector = code_correcting_agent
+
+        # linter
+        self.linter = linting_agent
 
     def install_dependencies(self, deps: List[str]) -> str:
         # if it's a string, e.g. "['openai']", turn into list ['openai']
@@ -160,75 +166,6 @@ class TaskExecutor:
         relevant_docs = get_relevant_documents(query=task, retriever=retriever)
         return relevant_docs
 
-    def execute(
-        self,
-        task: str,
-        libraries: Optional[List[str]] = None,
-        source_code: Optional[str] = None,
-    ):
-        # Generating a coding plan
-        retriever = WeaviateHybridSearchRetriever(
-            client=client,
-            index_name="DocumentionFile",
-            text_key="content",
-            k=10,
-            alpha=0.75,
-        )
-
-        relevant_docs = get_relevant_documents(query=task, retriever=retriever)
-        # get_embedding_store(start_urls=libraries)
-        # relevant_docs = get_read_the_docs_context(task, k=10)
-        # generate coding plan given context
-        plan = self.planner.execute(
-            function_name="execute_plan", task=task, context=relevant_docs
-        )
-
-        # install dependencies from plan
-        if self.config.execute_code and self.config.install_dependencies:
-            deps = self.dependency_tracker.execute(
-                function_name="install_dependencies", plan=plan
-            )
-            self.install_dependencies(deps)
-
-        # generate code
-        new_code = self.coder.execute(
-            task=task,
-            function_name="execute_code",
-            source_code=self.code_editor.display_code(),
-            plan=plan,
-            context=relevant_docs,
-        )
-        new_code = self.format_code(code=new_code, dependencies=deps)
-        self.code_editor.overwrite_code(new_source=new_code)
-        validation = (
-            self.code_editor.run_linter()
-        )  # validate_code_imports(code=new_code, dependencies = deps)
-        print(f"{validation=}")
-        # run generated code
-        error = self.run_code(new_code)
-
-        attempt = 0
-        while "Failed" in error:
-            if attempt > self.config.coding_attempts:
-                break
-            # corrected code
-            new_code = self.code_corrector.execute(
-                function_name="execute_code",
-                task=task,
-                context=relevant_docs,
-                source_code=new_code,
-                error=error,
-            )
-            new_code = self.format_code(code=new_code, dependencies=deps)
-            self.code_editor.overwrite_code(new_source=new_code)
-            validation = (
-                self.code_editor.run_linter()
-            )  # validate_code_imports(code=new_code, dependencies = deps)
-            print(f"{validation=}")
-            error = self.run_code(new_code)
-            attempt += 1
-        return new_code
-
     def format_lint_code(
         self, code: str, dependencies: List[str]
     ) -> Tuple[str, List[str], int]:
@@ -269,17 +206,18 @@ class TaskExecutor:
         # relevant_docs = get_read_the_docs_context(task, k=10)
         # generate coding plan given context
         plan = self.planner.execute(
-            function_name="execute_plan",
+            tool_choice="execute_plan",
             chat_history=[],
             task=task,
             context=relevant_docs,
         )[0]["content"]
-
+        plan = json.loads(plan)
         # install dependencies from plan
         if self.config.execute_code and self.config.install_dependencies:
             deps = self.dependency_tracker.execute(
-                function_name="install_dependencies", chat_history=[], plan=plan
+                tool_choice="install_dependencies", chat_history=[], plan=plan
             )[0]["content"]
+            deps = json.loads(deps)
             self.install_dependencies(deps)
         chat_history.append(
             {"role": "assistant", "content": f"installed dependencies {deps}"}
@@ -287,25 +225,35 @@ class TaskExecutor:
         # generate code
         new_code = self.coder.execute(
             task=task,
-            function_name="execute_code",
+            tool_choice="execute_code",
             chat_history=chat_history,
             plan=plan,
             context=relevant_docs,
         )[0]["content"]
+        new_code = json.loads(new_code)
         new_code = self.format_code(code=new_code, dependencies=deps)
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
         )
         # feed in lint results
         print(f"{lint_result=}")
+        lint_query_results = self.linter.execute(
+            tool_choice="auto", source_code=new_code, linter_output=lint_result
+        )
+        lint_response = openai.chat.completions.create(
+            model="gpt-3.5-turbo-1106",
+            messages=lint_query_results,
+        )
+        print(f"{lint_response=}")
         new_code = self.code_corrector.execute(
-            function_name="execute_code",
+            tool_choice="execute_code",
             chat_history=[],
             task=task,
             context=relevant_docs,
             source_code=new_code,
-            error=lint_result,
+            error=lint_response,
         )[0]["content"]
+        new_code = json.loads(new_code)
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
         )
@@ -336,13 +284,14 @@ class TaskExecutor:
             time_stamp = datetime.datetime.now().isoformat()
             # corrected code
             new_code = self.code_corrector.execute(
-                function_name="execute_code",
+                tool_choice="execute_code",
                 chat_history=[],
                 task=task,
                 context=relevant_docs,
                 source_code=new_code,
                 error=error,
             )[0]["content"]
+            new_code = json.loads(new_code)
             formatted_code, lint_result, metric = self.format_lint_code(
                 code=new_code, dependencies=deps
             )
