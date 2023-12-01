@@ -11,6 +11,14 @@ from codinit.config import client
 
 
 def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
+    """
+    Simple function to call OpenAI API without function calls.
+    Args:
+        user_prompt: will contain a request for explaantion containing variables handed in at call time where we ask GPT to formulate
+            an answer about the given varables.
+        modelname: GPT model to use for API call
+
+    """
     messages = []
     # Start by adding the user's message to the messages list
     messages.append({"role": "user", "content": user_prompt})
@@ -36,6 +44,9 @@ def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
 
 
 def file_already_exists(filename: str, link: str, client: weaviate.Client) -> bool:
+    """
+    Checks if file has already been visited before so it can be skipped.
+    """
     query = f"""
     {{
         Get {{
@@ -68,6 +79,10 @@ def get_full_name(node):
 
 
 class FunctionInfoCollector(libcst.CSTVisitor):
+    """
+    Visitor for functions in the code file that is being parsed
+    """
+
     def __init__(self):
         self.parameters = []
         self.local_variables = []
@@ -88,6 +103,10 @@ class FunctionInfoCollector(libcst.CSTVisitor):
 
 
 def extract_function_info(function_node):
+    """
+    Extract function information from function node, collects code, parameters, variables used in the function
+    and rerurn value.
+    """
     function_code = libcst.Module([function_node]).code
     visitor = FunctionInfoCollector()
     function_node.visit(visitor)
@@ -100,6 +119,10 @@ def extract_function_info(function_node):
 
 
 class AttributeCollector(libcst.CSTVisitor):
+    """
+    Visitor to collect attributes from classes
+    """
+
     def __init__(self):
         self.attributes = []
 
@@ -109,7 +132,7 @@ class AttributeCollector(libcst.CSTVisitor):
 
 
 def extract_attributes(class_node):
-    """gives back a list of Class attributes"""
+    """Gives back a list of Class attributes"""
     visitor = AttributeCollector()
     class_node.visit(visitor)
     return visitor.attributes
@@ -343,7 +366,7 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
 
 def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.Client):
     """
-    Analyzes all Python files in a directory (and its subdirectories), returning a
+    Analyzes all Python files in a directory (and its subdirectories), collects a
     list of dictionaries containing filename, function names, and class names for each file.
     """
     print("analyzing directory")
