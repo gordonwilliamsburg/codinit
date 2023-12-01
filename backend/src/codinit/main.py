@@ -11,14 +11,18 @@ TASKS = [
     "using langchain library, write code that answers a question over a given text.",
     "using the langchain library, write code for an agent that answers math questions.",
     "using the langchain library, write code that automatically gives information about the weather.",
-    "using the langchain library, write code for a python coding agent that writes code based on prompts.",
+    "using the langchain library, write code for a coding agent that writes python code based on prompts.",
+    "using the langchain library, write code to answer some questions by reading wikipedia articles.",
+]
+
+"""
     "using the langchain library, write code for an agent that collects information about products from the internet and gives a competitor analysis.",
     "using the langchain library, write code that summarizes a pdf document.",
     "using the langchain library, write code that for an agent that writes stories.",
     "using the langchain library, write code for an agent that translates text.",
     "using the langchain library, write code for an agent that writes a Jira ticket based on a conversation with the user.",
     "using the langchain library, write code for a research agent that collects papers related to a specific topic and generates a summary of the research.",
-]
+"""
 
 
 def get_git_info() -> Tuple[str, str]:
@@ -55,6 +59,9 @@ def main():
 
         run_id = last_run_id + 1
         for task_id, task in enumerate(TASKS):
+            code_editor = PythonCodeEditor()
+            config = TaskExecutionConfig()
+            task_executor = TaskExecutor(code_editor, config)
             print("---------new_task-----------")
             task_executor.execute_and_log(
                 task=task,

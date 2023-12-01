@@ -1,12 +1,14 @@
 from typing import List
 
-import weaviate
-
 from codinit.config import client
 
 
-def get_files(prompt: str, client: weaviate.Client = client, k=5):
-    """Returns code file relevant for a given prompt"""
+def get_files(prompt: str, k: int = 1):
+    """Returns code file relevant for a given prompt
+    Args:
+        prompt: str, description of the file to search for.
+        k: int, the number of most similar files to the prompt to be returned by the query.
+    """
     result = (
         client.query.get(
             "File",
@@ -24,7 +26,12 @@ def get_files(prompt: str, client: weaviate.Client = client, k=5):
     return result["data"]["Get"]["File"]
 
 
-def get_classes(prompt: str, client: weaviate.Client = client, k=5):
+def get_classes(prompt: str, k: int = 1):
+    """Returns code classes relevant for a given prompt
+    Args:
+        prompt: str, description of the class to search for.
+        k: int, the number of most similar classes to the prompt to be returned by the query.
+    """
     result = (
         client.query.get(
             "Class",
@@ -37,7 +44,12 @@ def get_classes(prompt: str, client: weaviate.Client = client, k=5):
     return result["data"]["Get"]["Class"]
 
 
-def get_imports(prompt: str, client: weaviate.Client = client, k=5):
+def get_imports(prompt: str, k: int = 1):
+    """Returns code imports relevant for a given prompt
+    Args:
+        prompt: str, description of the import to search for.
+        k: int, the number of most similar imports to the prompt to be returned by the query.
+    """
     result = (
         client.query.get(
             "Import",
@@ -50,30 +62,12 @@ def get_imports(prompt: str, client: weaviate.Client = client, k=5):
     return result["data"]["Get"]["Import"]
 
 
-def get_exact_imports(query: str, client: weaviate.Client = client, k=5):
-    result = (
-        client.query.get(
-            "Import",
-            properties=["name"],
-        )
-        .with_bm25(query=query, properties=["name"])
-        .with_limit(k)
-        .do()
-    )
-    return result["data"]["Get"]["Import"]
-
-
-def get_imports_from_kg(
-    import_list: List[str], library_name: str, client: weaviate.Client = client, k=10
-):
-    result = {}
-    for import_name in import_list:
-        exists_in_weaviate_kg = get_exact_imports(query=import_name, client=client, k=k)
-        result[import_name] = exists_in_weaviate_kg
-    return result
-
-
-def get_functions(prompt: str, client: weaviate.Client, k=5):
+def get_functions(prompt: str, k: int = 1):
+    """Returns code functions relevant for a given prompt
+    Args:
+        prompt: str, description of the function to search for.
+        k: int, the number of most similar functions to the prompt to be returned by the query.
+    """
     result = (
         client.query.get(
             "Function",
@@ -92,3 +86,25 @@ def get_functions(prompt: str, client: weaviate.Client, k=5):
         .do()
     )
     return result["data"]["Get"]["Function"]
+
+
+def get_exact_imports(query: str, k: int = 1):
+    """Returns exact imports relevant for a given prompt"""
+    result = (
+        client.query.get(
+            "Import",
+            properties=["name"],
+        )
+        .with_bm25(query=query, properties=["name"])
+        .with_limit(k)
+        .do()
+    )
+    return result["data"]["Get"]["Import"]
+
+
+def get_imports_from_kg(import_list: List[str], library_name: str, k=10):
+    result = {}
+    for import_name in import_list:
+        exists_in_weaviate_kg = get_exact_imports(query=import_name, k=k)
+        result[import_name] = exists_in_weaviate_kg
+    return result

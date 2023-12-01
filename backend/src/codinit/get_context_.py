@@ -176,7 +176,7 @@ def get_relevant_documents(query: str, retriever: WeaviateHybridSearchRetriever)
         query = result[0]
     print(query)
     docs = retriever.get_relevant_documents(query=query)
-    print(f"{docs=}")
+    # print(f"{docs=}")
     relevant_docs = ""
     for doc in docs:
         relevant_docs += doc.page_content

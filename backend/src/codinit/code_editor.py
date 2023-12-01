@@ -125,6 +125,9 @@ class PythonCodeEditor(CodeEditorTooling):
         return final_result
 
     def run_linter(self):
+        """
+        Runs pylint in a subprocess on the code saved in self.filename and return a list of error messages
+        """
         cmd = [
             "pylint",
             self.filename,

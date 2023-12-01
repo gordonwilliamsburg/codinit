@@ -48,24 +48,14 @@ class Secrets(BaseSettings):
         env_file_encoding = "utf-8"
 
 
-class EmbeddingSettings(BaseSettings):
-    """Configuration for available embedidng models."""
+class AgentSettings(BaseSettings):
+    """Configuration of coding agents"""
 
-    openai: List[str]
-    huggingface: List[str]
-
-    class Config:
-        extra = "ignore"
-
-
-class ModelSettings(BaseSettings):
-    """Configuration for available LLM models."""
-
-    openai: List[str]
-    gpt4all: List[str]
-
-    class Config:
-        extra = "ignore"
+    planner_model: str
+    dependency_model: str
+    coder_model: str
+    code_corrector_model: str
+    linter_model: str
 
 
 class EvalSettings(BaseSettings):
@@ -76,10 +66,9 @@ class EvalSettings(BaseSettings):
 
 
 secrets = Secrets()
-embedding_settings = from_yaml(EmbeddingSettings, "configs/embeddings.yaml")
-model_settings = from_yaml(ModelSettings, "configs/models.yaml")
-eval_settings = from_yaml(EvalSettings, "configs/eval.yaml")
 
+eval_settings = from_yaml(EvalSettings, "configs/eval.yaml")
+agent_settings = from_yaml(AgentSettings, "configs/agents.yaml")
 client = weaviate.Client(
     embedded_options=EmbeddedOptions(
         persistence_data_path=secrets.persist_dir,
