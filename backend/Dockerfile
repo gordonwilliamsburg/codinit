@@ -28,10 +28,14 @@ COPY poetry.lock .
 COPY .env .
 
 RUN poetry config virtualenvs.create false
-RUN poetry install --no-interaction --no-ansi --no-root \
-    && rm -r /root/.cache
+RUN poetry install --no-interaction --no-ansi --without dev,test,docs,viz
+
+# uncomment to remove cached files and keep lightweight Docker image
+# comment out to keep cached files, including the Poetry cache, between rebuilds
+# RUN rm -r /root/.cache
 
 COPY ./configs ./configs/
+
 # Copy the entire project's source code into the container
 
 COPY ./src /app
