@@ -30,3 +30,4 @@ draft/
 src/codinit/checks/get_import_and_usage_not_relevant.py
 src/codinit/checks/move_imports_and_modules_not_working.py
 sample_code/
+wandb/
