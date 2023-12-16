@@ -186,6 +186,33 @@ class TaskExecutor:
         # run generated code
         return formatted_code, lint_result, metric
 
+    def write_row(
+        self,
+        attempt: int,
+        formatted_code: str,
+        lint_result: List[str],
+        metric: int,
+        error: Union[str, List[str]],
+        time_stamp: str,
+    ):
+        row = [
+            self.run_id,
+            self.task_id,
+            self.task,
+            attempt,
+            formatted_code,
+            lint_result,
+            metric,
+            error,
+            self.sha,
+            self.message,
+            time_stamp,
+        ]
+        row_dict = {
+            key: value for key, value in list(zip(eval_settings.eval_columns, row))
+        }
+        self.csv_writer.writerow(row_dict)
+
     # TODO: add plan to benchmark
     def execute_and_log(
         self,
@@ -260,23 +287,14 @@ class TaskExecutor:
         # run generated code
         error = self.run_code(formatted_code)
         # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
-        row = [
-            self.run_id,
-            self.task_id,
-            self.task,
-            attempt,
-            formatted_code,
-            lint_result,
-            metric,
-            error,
-            self.sha,
-            self.message,
-            time_stamp,
-        ]
-        row_dict = {
-            key: value for key, value in list(zip(eval_settings.eval_columns, row))
-        }
-        self.csv_writer.writerow(row_dict)
+        self.write_row(
+            attempt=attempt,
+            formatted_code=formatted_code,
+            lint_result=lint_result,
+            metric=metric,
+            error=error,
+            time_stamp=time_stamp,
+        )
         attempt = 1
         while "Failed" in error:
             if attempt > self.config.coding_attempts:
@@ -297,22 +315,13 @@ class TaskExecutor:
             # run generated code
             error = self.run_code(formatted_code)
             # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
-            row = [
-                self.run_id,
-                self.task_id,
-                self.task,
-                attempt,
-                formatted_code,
-                lint_result,
-                metric,
-                error,
-                self.sha,
-                self.message,
-                time_stamp,
-            ]
-            row_dict = {
-                key: value for key, value in list(zip(eval_settings.eval_columns, row))
-            }
-            self.csv_writer.writerow(row_dict)
+            self.write_row(
+                attempt=attempt,
+                formatted_code=formatted_code,
+                lint_result=lint_result,
+                metric=metric,
+                error=error,
+                time_stamp=time_stamp,
+            )
             attempt += 1
         return new_code
