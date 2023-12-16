@@ -1,6 +1,5 @@
 import ast
 import datetime
-import json
 import logging
 from csv import DictWriter
 from dataclasses import dataclass
@@ -8,8 +7,8 @@ from typing import List, Optional, Tuple
 
 import openai
 import requests
-from langchain.chat_models import ChatOpenAI
 from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
+from pydantic import BaseModel
 
 from codinit.agents import (
     code_correcting_agent,
@@ -22,8 +21,7 @@ from codinit.code_editor import PythonCodeEditor
 from codinit.config import client, eval_settings
 
 # from codinit.get_context import get_embedding_store, get_read_the_docs_context
-from codinit.get_context_ import get_relevant_documents, get_retriever
-from codinit.queries import get_classes, get_files, get_functions, get_imports
+from codinit.get_context_ import get_relevant_documents
 
 logger = logging.getLogger(__name__)
 ANSWER_PATTERN = r"[a-zA-Z]+"
@@ -37,20 +35,18 @@ def _trim_md(code_editor: PythonCodeEditor):
         code_editor.overwrite_code(code_editor.display_code())
 
 
-# TODO: Check difference between dataclass and pydantic object: https://towardsdatascience.com/pydantic-or-dataclasses-why-not-both-convert-between-them-ba382f0f9a9c
-@dataclass
-class TaskExecutionConfig:
-    execute_code = True
-    install_dependencies = True
-    check_package_is_in_pypi = True
-    log_to_stdout = True
-    coding_attempts = 1
-    max_coding_attempts = 5
-    dependency_install_attempts = 5
-    planner_temperature = 0
-    coder_temperature = 0.0
-    code_corrector_temperature = 0
-    dependency_tracker_temperature = 0
+class TaskExecutionConfig(BaseModel):
+    execute_code: bool = True
+    install_dependencies: bool = True
+    check_package_is_in_pypi: bool = True
+    log_to_stdout: bool = True
+    coding_attempts: int = 1
+    max_coding_attempts: int = 5
+    dependency_install_attempts: int = 5
+    planner_temperature: float = 0
+    coder_temperature: float = 0.0
+    code_corrector_temperature: float = 0
+    dependency_tracker_temperature: float = 0
 
 
 class TaskExecutor:
@@ -228,6 +224,7 @@ class TaskExecutor:
             plan=plan,
             context=relevant_docs,
         )[0]
+        # TODO need to remove reducndand code formatting step
         new_code = self.format_code(code=new_code, dependencies=deps)
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
