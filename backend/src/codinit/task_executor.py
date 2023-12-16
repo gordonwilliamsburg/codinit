@@ -2,8 +2,7 @@ import ast
 import datetime
 import logging
 from csv import DictWriter
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import openai
 import requests
@@ -54,6 +53,12 @@ class TaskExecutor:
         self,
         code_editor: PythonCodeEditor,
         config: TaskExecutionConfig,
+        task: str,
+        run_id: int,
+        task_id: int,
+        sha: str,
+        message: str,
+        csv_writer: DictWriter,
     ) -> None:
         self.code_editor = code_editor
         self.config = config
@@ -72,6 +77,13 @@ class TaskExecutor:
 
         # linter
         self.linter = linting_agent
+
+        self.task = task
+        self.run_id = run_id
+        self.task_id = task_id
+        self.sha = (sha,)
+        self.message = (message,)
+        self.csv_writer = csv_writer
 
     def install_dependencies(self, deps: List[str]) -> str:
         # if it's a string, e.g. "['openai']", turn into list ['openai']
@@ -177,12 +189,6 @@ class TaskExecutor:
     # TODO: add plan to benchmark
     def execute_and_log(
         self,
-        task: str,
-        run_id: int,
-        task_id: int,
-        sha: str,
-        message: str,
-        csv_writer: DictWriter,
         libraries: Optional[List[str]] = None,
         source_code: Optional[str] = None,
     ):
@@ -197,14 +203,14 @@ class TaskExecutor:
             alpha=0.75,
         )
         time_stamp = datetime.datetime.now().isoformat()
-        relevant_docs = get_relevant_documents(query=task, retriever=retriever)
+        relevant_docs = get_relevant_documents(query=self.task, retriever=retriever)
         # get_embedding_store(start_urls=libraries)
         # relevant_docs = get_read_the_docs_context(task, k=10)
         # generate coding plan given context
         plan = self.planner.execute(
             tool_choice="execute_plan",
             chat_history=[],
-            task=task,
+            task=self.task,
             context=relevant_docs,
         )[0]
         # install dependencies from plan
@@ -218,7 +224,7 @@ class TaskExecutor:
         )
         # generate code
         new_code = self.coder.execute(
-            task=task,
+            task=self.task,
             tool_choice="execute_code",
             chat_history=chat_history,
             plan=plan,
@@ -243,7 +249,7 @@ class TaskExecutor:
         new_code = self.code_corrector.execute(
             tool_choice="execute_code",
             chat_history=[],
-            task=task,
+            task=self.task,
             context=relevant_docs,
             source_code=new_code,
             error=lint_response,
@@ -255,22 +261,22 @@ class TaskExecutor:
         error = self.run_code(formatted_code)
         # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
         row = [
-            run_id,
-            task_id,
-            task,
+            self.run_id,
+            self.task_id,
+            self.task,
             attempt,
             formatted_code,
             lint_result,
             metric,
             error,
-            sha,
-            message,
+            self.sha,
+            self.message,
             time_stamp,
         ]
         row_dict = {
             key: value for key, value in list(zip(eval_settings.eval_columns, row))
         }
-        csv_writer.writerow(row_dict)
+        self.csv_writer.writerow(row_dict)
         attempt = 1
         while "Failed" in error:
             if attempt > self.config.coding_attempts:
@@ -280,7 +286,7 @@ class TaskExecutor:
             new_code = self.code_corrector.execute(
                 tool_choice="execute_code",
                 chat_history=[],
-                task=task,
+                task=self.task,
                 context=relevant_docs,
                 source_code=new_code,
                 error=error,
@@ -292,21 +298,21 @@ class TaskExecutor:
             error = self.run_code(formatted_code)
             # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
             row = [
-                run_id,
-                task_id,
-                task,
+                self.run_id,
+                self.task_id,
+                self.task,
                 attempt,
                 formatted_code,
                 lint_result,
                 metric,
                 error,
-                sha,
-                message,
+                self.sha,
+                self.message,
                 time_stamp,
             ]
             row_dict = {
                 key: value for key, value in list(zip(eval_settings.eval_columns, row))
             }
-            csv_writer.writerow(row_dict)
+            self.csv_writer.writerow(row_dict)
             attempt += 1
         return new_code
