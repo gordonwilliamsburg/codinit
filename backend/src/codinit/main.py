@@ -1,5 +1,4 @@
 import csv
-import datetime
 import subprocess
 from typing import Tuple
 
@@ -32,9 +31,6 @@ def get_git_info() -> Tuple[str, str]:
 
 
 def main():
-    code_editor = PythonCodeEditor()
-    config = TaskExecutionConfig()
-    task_executor = TaskExecutor(code_editor, config)
     # Get git info
     sha, message = get_git_info()
 
@@ -61,15 +57,18 @@ def main():
         for task_id, task in enumerate(TASKS):
             code_editor = PythonCodeEditor()
             config = TaskExecutionConfig()
-            task_executor = TaskExecutor(code_editor, config)
-            print("---------new_task-----------")
-            task_executor.execute_and_log(
+            task_executor = TaskExecutor(
+                code_editor=code_editor,
+                config=config,
                 task=task,
                 run_id=run_id,
                 task_id=task_id,
                 sha=sha,
                 message=message,
                 csv_writer=writer,
+            )
+            print("---------new_task-----------")
+            task_executor.execute_and_log(
                 source_code="",
                 libraries=[],
             )

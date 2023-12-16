@@ -1,15 +1,13 @@
 import ast
 import datetime
-import json
 import logging
 from csv import DictWriter
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import openai
 import requests
-from langchain.chat_models import ChatOpenAI
 from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
+from pydantic import BaseModel
 
 from codinit.agents import (
     code_correcting_agent,
@@ -22,8 +20,7 @@ from codinit.code_editor import PythonCodeEditor
 from codinit.config import client, eval_settings
 
 # from codinit.get_context import get_embedding_store, get_read_the_docs_context
-from codinit.get_context_ import get_relevant_documents, get_retriever
-from codinit.queries import get_classes, get_files, get_functions, get_imports
+from codinit.get_context_ import get_relevant_documents
 
 logger = logging.getLogger(__name__)
 ANSWER_PATTERN = r"[a-zA-Z]+"
@@ -37,20 +34,18 @@ def _trim_md(code_editor: PythonCodeEditor):
         code_editor.overwrite_code(code_editor.display_code())
 
 
-# TODO: Check difference between dataclass and pydantic object: https://towardsdatascience.com/pydantic-or-dataclasses-why-not-both-convert-between-them-ba382f0f9a9c
-@dataclass
-class TaskExecutionConfig:
-    execute_code = True
-    install_dependencies = True
-    check_package_is_in_pypi = True
-    log_to_stdout = True
-    coding_attempts = 1
-    max_coding_attempts = 5
-    dependency_install_attempts = 5
-    planner_temperature = 0
-    coder_temperature = 0.0
-    code_corrector_temperature = 0
-    dependency_tracker_temperature = 0
+class TaskExecutionConfig(BaseModel):
+    execute_code: bool = True
+    install_dependencies: bool = True
+    check_package_is_in_pypi: bool = True
+    log_to_stdout: bool = True
+    coding_attempts: int = 1
+    max_coding_attempts: int = 5
+    dependency_install_attempts: int = 5
+    planner_temperature: float = 0
+    coder_temperature: float = 0.0
+    code_corrector_temperature: float = 0
+    dependency_tracker_temperature: float = 0
 
 
 class TaskExecutor:
@@ -58,6 +53,12 @@ class TaskExecutor:
         self,
         code_editor: PythonCodeEditor,
         config: TaskExecutionConfig,
+        task: str,
+        run_id: int,
+        task_id: int,
+        sha: str,
+        message: str,
+        csv_writer: DictWriter,
     ) -> None:
         self.code_editor = code_editor
         self.config = config
@@ -76,6 +77,13 @@ class TaskExecutor:
 
         # linter
         self.linter = linting_agent
+
+        self.task = task
+        self.run_id = run_id
+        self.task_id = task_id
+        self.sha = (sha,)
+        self.message = (message,)
+        self.csv_writer = csv_writer
 
     def install_dependencies(self, deps: List[str]) -> str:
         # if it's a string, e.g. "['openai']", turn into list ['openai']
@@ -178,15 +186,84 @@ class TaskExecutor:
         # run generated code
         return formatted_code, lint_result, metric
 
+    def write_row(
+        self,
+        attempt: int,
+        formatted_code: str,
+        lint_result: List[str],
+        metric: int,
+        error: Union[str, List[str]],
+        time_stamp: str,
+    ):
+        row = [
+            self.run_id,
+            self.task_id,
+            self.task,
+            attempt,
+            formatted_code,
+            lint_result,
+            metric,
+            error,
+            self.sha,
+            self.message,
+            time_stamp,
+        ]
+        row_dict = {
+            key: value for key, value in list(zip(eval_settings.eval_columns, row))
+        }
+        self.csv_writer.writerow(row_dict)
+
+    def code_correction_with_linting(
+        self,
+        new_code: str,
+        deps: List[str],
+        relevant_docs: str,
+        attempt: int,
+        time_stamp: str,
+    ):
+        formatted_code, lint_result, metric = self.format_lint_code(
+            code=new_code, dependencies=deps
+        )
+        # feed in lint results
+        print(f"{lint_result=}")
+        # TODO: check if linting output is not empty
+        if len(lint_result) > 0:
+            lint_query_results = self.linter.execute(
+                source_code=new_code, linter_output=lint_result
+            )
+            print(lint_query_results)
+            lint_response = openai.chat.completions.create(
+                model="gpt-3.5-turbo-1106",
+                messages=self.linter.messages,
+            )
+            print(f"{lint_response=}")
+            new_code = self.code_corrector.execute(
+                tool_choice="execute_code",
+                chat_history=[],
+                task=self.task,
+                context=relevant_docs,
+                source_code=new_code,
+                error=lint_response,
+            )[0]
+            formatted_code, lint_result, metric = self.format_lint_code(
+                code=new_code, dependencies=deps
+            )
+        # run generated code
+        error = self.run_code(formatted_code)
+        # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
+        self.write_row(
+            attempt=attempt,
+            formatted_code=formatted_code,
+            lint_result=lint_result,
+            metric=metric,
+            error=error,
+            time_stamp=time_stamp,
+        )
+        return error
+
     # TODO: add plan to benchmark
     def execute_and_log(
         self,
-        task: str,
-        run_id: int,
-        task_id: int,
-        sha: str,
-        message: str,
-        csv_writer: DictWriter,
         libraries: Optional[List[str]] = None,
         source_code: Optional[str] = None,
     ):
@@ -201,14 +278,12 @@ class TaskExecutor:
             alpha=0.75,
         )
         time_stamp = datetime.datetime.now().isoformat()
-        relevant_docs = get_relevant_documents(query=task, retriever=retriever)
-        # get_embedding_store(start_urls=libraries)
-        # relevant_docs = get_read_the_docs_context(task, k=10)
+        relevant_docs = get_relevant_documents(query=self.task, retriever=retriever)
         # generate coding plan given context
         plan = self.planner.execute(
             tool_choice="execute_plan",
             chat_history=[],
-            task=task,
+            task=self.task,
             context=relevant_docs,
         )[0]
         # install dependencies from plan
@@ -222,94 +297,32 @@ class TaskExecutor:
         )
         # generate code
         new_code = self.coder.execute(
-            task=task,
+            task=self.task,
             tool_choice="execute_code",
             chat_history=chat_history,
             plan=plan,
             context=relevant_docs,
         )[0]
-        new_code = self.format_code(code=new_code, dependencies=deps)
-        formatted_code, lint_result, metric = self.format_lint_code(
-            code=new_code, dependencies=deps
+        # TODO need to remove redundant code formatting step
+        error = self.code_correction_with_linting(
+            new_code=new_code,
+            deps=deps,
+            relevant_docs=relevant_docs,
+            attempt=attempt,
+            time_stamp=time_stamp,
         )
-        # feed in lint results
-        print(f"{lint_result=}")
-        lint_query_results = self.linter.execute(
-            source_code=new_code, linter_output=lint_result
-        )
-        print(lint_query_results)
-        lint_response = openai.chat.completions.create(
-            model="gpt-3.5-turbo-1106",
-            messages=self.linter.messages,
-        )
-        print(f"{lint_response=}")
-        new_code = self.code_corrector.execute(
-            tool_choice="execute_code",
-            chat_history=[],
-            task=task,
-            context=relevant_docs,
-            source_code=new_code,
-            error=lint_response,
-        )[0]
-        formatted_code, lint_result, metric = self.format_lint_code(
-            code=new_code, dependencies=deps
-        )
-        # run generated code
-        error = self.run_code(formatted_code)
-        # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
-        row = [
-            run_id,
-            task_id,
-            task,
-            attempt,
-            formatted_code,
-            lint_result,
-            metric,
-            error,
-            sha,
-            message,
-            time_stamp,
-        ]
-        row_dict = {
-            key: value for key, value in list(zip(eval_settings.eval_columns, row))
-        }
-        csv_writer.writerow(row_dict)
         attempt = 1
         while "Failed" in error:
             if attempt > self.config.coding_attempts:
                 break
             time_stamp = datetime.datetime.now().isoformat()
             # corrected code
-            new_code = self.code_corrector.execute(
-                tool_choice="execute_code",
-                chat_history=[],
-                task=task,
-                context=relevant_docs,
-                source_code=new_code,
-                error=error,
-            )[0]
-            formatted_code, lint_result, metric = self.format_lint_code(
-                code=new_code, dependencies=deps
+            error = self.code_correction_with_linting(
+                new_code=new_code,
+                deps=deps,
+                relevant_docs=relevant_docs,
+                attempt=attempt,
+                time_stamp=time_stamp,
             )
-            # run generated code
-            error = self.run_code(formatted_code)
-            # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
-            row = [
-                run_id,
-                task_id,
-                task,
-                attempt,
-                formatted_code,
-                lint_result,
-                metric,
-                error,
-                sha,
-                message,
-                time_stamp,
-            ]
-            row_dict = {
-                key: value for key, value in list(zip(eval_settings.eval_columns, row))
-            }
-            csv_writer.writerow(row_dict)
             attempt += 1
         return new_code
