@@ -3,7 +3,6 @@ import re
 from typing import List, Optional
 
 import weaviate
-from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders.base import Document
 from langchain.document_loaders.recursive_url_loader import RecursiveUrlLoader
 from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
@@ -209,11 +208,10 @@ for link in links:
             )
     tiny_docs=text_splitter.split_documents(docs)
     print(tiny_docs)
-
+"""
 retriever = get_retriever(libname=libname, links=links, weaviate_client=client)
 relevant_docs = get_relevant_documents(
     query="Using the langchain library, write code that loads a user given pdf file, chunks it and then creates a summary of it.",
     retriever=retriever,
 )
 print(relevant_docs)
-"""
