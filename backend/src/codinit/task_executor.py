@@ -213,6 +213,54 @@ class TaskExecutor:
         }
         self.csv_writer.writerow(row_dict)
 
+    def code_correction_with_linting(
+        self,
+        new_code: str,
+        deps: List[str],
+        relevant_docs: str,
+        attempt: int,
+        time_stamp: str,
+    ):
+        formatted_code, lint_result, metric = self.format_lint_code(
+            code=new_code, dependencies=deps
+        )
+        # feed in lint results
+        print(f"{lint_result=}")
+        # TODO: check if linting output is not empty
+        if len(lint_result) > 0:
+            lint_query_results = self.linter.execute(
+                source_code=new_code, linter_output=lint_result
+            )
+            print(lint_query_results)
+            lint_response = openai.chat.completions.create(
+                model="gpt-3.5-turbo-1106",
+                messages=self.linter.messages,
+            )
+            print(f"{lint_response=}")
+            new_code = self.code_corrector.execute(
+                tool_choice="execute_code",
+                chat_history=[],
+                task=self.task,
+                context=relevant_docs,
+                source_code=new_code,
+                error=lint_response,
+            )[0]
+            formatted_code, lint_result, metric = self.format_lint_code(
+                code=new_code, dependencies=deps
+            )
+        # run generated code
+        error = self.run_code(formatted_code)
+        # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
+        self.write_row(
+            attempt=attempt,
+            formatted_code=formatted_code,
+            lint_result=lint_result,
+            metric=metric,
+            error=error,
+            time_stamp=time_stamp,
+        )
+        return error
+
     # TODO: add plan to benchmark
     def execute_and_log(
         self,
@@ -231,8 +279,6 @@ class TaskExecutor:
         )
         time_stamp = datetime.datetime.now().isoformat()
         relevant_docs = get_relevant_documents(query=self.task, retriever=retriever)
-        # get_embedding_store(start_urls=libraries)
-        # relevant_docs = get_read_the_docs_context(task, k=10)
         # generate coding plan given context
         plan = self.planner.execute(
             tool_choice="execute_plan",
@@ -257,42 +303,12 @@ class TaskExecutor:
             plan=plan,
             context=relevant_docs,
         )[0]
-        # TODO need to remove reducndand code formatting step
-        new_code = self.format_code(code=new_code, dependencies=deps)
-        formatted_code, lint_result, metric = self.format_lint_code(
-            code=new_code, dependencies=deps
-        )
-        # feed in lint results
-        print(f"{lint_result=}")
-        lint_query_results = self.linter.execute(
-            source_code=new_code, linter_output=lint_result
-        )
-        print(lint_query_results)
-        lint_response = openai.chat.completions.create(
-            model="gpt-3.5-turbo-1106",
-            messages=self.linter.messages,
-        )
-        print(f"{lint_response=}")
-        new_code = self.code_corrector.execute(
-            tool_choice="execute_code",
-            chat_history=[],
-            task=self.task,
-            context=relevant_docs,
-            source_code=new_code,
-            error=lint_response,
-        )[0]
-        formatted_code, lint_result, metric = self.format_lint_code(
-            code=new_code, dependencies=deps
-        )
-        # run generated code
-        error = self.run_code(formatted_code)
-        # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
-        self.write_row(
+        # TODO need to remove redundant code formatting step
+        error = self.code_correction_with_linting(
+            new_code=new_code,
+            deps=deps,
+            relevant_docs=relevant_docs,
             attempt=attempt,
-            formatted_code=formatted_code,
-            lint_result=lint_result,
-            metric=metric,
-            error=error,
             time_stamp=time_stamp,
         )
         attempt = 1
@@ -301,26 +317,11 @@ class TaskExecutor:
                 break
             time_stamp = datetime.datetime.now().isoformat()
             # corrected code
-            new_code = self.code_corrector.execute(
-                tool_choice="execute_code",
-                chat_history=[],
-                task=self.task,
-                context=relevant_docs,
-                source_code=new_code,
-                error=error,
-            )[0]
-            formatted_code, lint_result, metric = self.format_lint_code(
-                code=new_code, dependencies=deps
-            )
-            # run generated code
-            error = self.run_code(formatted_code)
-            # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
-            self.write_row(
+            error = self.code_correction_with_linting(
+                new_code=new_code,
+                deps=deps,
+                relevant_docs=relevant_docs,
                 attempt=attempt,
-                formatted_code=formatted_code,
-                lint_result=lint_result,
-                metric=metric,
-                error=error,
                 time_stamp=time_stamp,
             )
             attempt += 1
