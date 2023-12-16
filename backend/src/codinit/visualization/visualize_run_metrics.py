@@ -4,9 +4,15 @@ import streamlit as st
 
 from codinit.config import eval_settings
 
+st.set_page_config(
+    page_icon=":female_vampire:",
+    page_title="Code Assistant Evaluation Dashboard",
+    layout="wide",
+)
+
 
 # Load the CSV data
-@st.cache
+@st.cache_data
 def load_data():
     return pd.read_csv(eval_settings.eval_dataset_location)
 
