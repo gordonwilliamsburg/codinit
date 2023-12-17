@@ -1,23 +1,9 @@
 import os
 from typing import List
-from urllib.parse import urlparse
 
-import weaviate
-from langchain.agents.agent_toolkits import create_python_agent
-from langchain.agents.mrkl.base import ZeroShotAgent
-from langchain.document_loaders import (
-    DirectoryLoader,
-    ReadTheDocsLoader,
-    TextLoader,
-    UnstructuredHTMLLoader,
-)
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.document_loaders import UnstructuredHTMLLoader
 from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
-from langchain.text_splitter import (
-    CharacterTextSplitter,
-    RecursiveCharacterTextSplitter,
-)
-from langchain.vectorstores import Chroma, Weaviate
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from codinit.config import Secrets, client, secrets
 from codinit.documentation.utils import download_html
