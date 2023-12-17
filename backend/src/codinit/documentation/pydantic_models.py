@@ -46,15 +46,15 @@ class RunInput(BaseModel):
     includeUrlGlobs: List[str] = Field(default_factory=list)
     excludeUrlGlobs: List[str] = Field(default_factory=list)
     ignoreCanonicalUrl: bool = Field(default=False)
-    maxCrawlDepth: Annotated[int, Field(gt=0)] = Field(default=20)
-    maxCrawlPages: Annotated[int, Field(gt=0)] = Field(default=9999999)
-    initialConcurrency: Annotated[int, Field(ge=0)] = Field(default=0)
-    maxConcurrency: Annotated[int, Field(gt=0)] = Field(default=200)
+    maxCrawlDepth: Annotated[int, Field(gt=0)] = 20
+    maxCrawlPages: Annotated[int, Field(gt=0)] = 9999999
+    initialConcurrency: Annotated[int, Field(ge=0)] = 0
+    maxConcurrency: Annotated[int, Field(gt=0)] = 200
     initialCookies: List[str] = Field(default_factory=list)
     proxyConfiguration: ProxyConfiguration = Field(default_factory=ProxyConfiguration)
-    requestTimeoutSecs: Annotated[int, Field(gt=0)] = Field(default=60)
-    dynamicContentWaitSecs: Annotated[int, Field(gt=0)] = Field(default=10)
-    maxScrollHeightPixels: Annotated[int, Field(ge=0)] = Field(default=5000)
+    requestTimeoutSecs: Annotated[int, Field(gt=0)] = 60
+    dynamicContentWaitSecs: Annotated[int, Field(gt=0)] = 10
+    maxScrollHeightPixels: Annotated[int, Field(ge=0)] = 5000
     removeElementsCssSelector: str = """nav, footer, script, style, noscript, svg,
 [role=\"alert\"],
 [role=\"banner\"],
@@ -65,7 +65,7 @@ class RunInput(BaseModel):
     removeCookieWarnings: bool = Field(default=True)
     clickElementsCssSelector: str = Field(default='[aria-expanded="false"]')
     htmlTransformer: Optional[str] = Field(default="readableText")
-    readableTextCharThreshold: Annotated[int, Field(ge=0)] = Field(default=100)
+    readableTextCharThreshold: Annotated[int, Field(ge=0)] = 100
     aggressivePrune: bool = Field(default=False)
     debugMode: bool = Field(default=False)
     debugLog: bool = Field(default=False)
@@ -73,4 +73,4 @@ class RunInput(BaseModel):
     saveMarkdown: bool = Field(default=True)
     saveFiles: bool = Field(default=False)
     saveScreenshots: bool = Field(default=False)
-    maxResults: Annotated[int, Field(gt=0)] = Field(default=9999999)
+    maxResults: Annotated[int, Field(gt=0)] = 9999999
