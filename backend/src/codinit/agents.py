@@ -10,7 +10,7 @@ from openai import RateLimitError
 from pydantic import create_model
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 
-from codinit.config import agent_settings, secrets
+from codinit.config import secrets
 from codinit.prompts import (
     code_corrector_system_prompt,
     code_corrector_user_prompt_template,

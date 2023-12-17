@@ -1,5 +1,4 @@
 import pandas as pd
-import st_aggrid
 import streamlit as st
 
 from codinit.config import eval_settings
