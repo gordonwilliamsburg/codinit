@@ -9,10 +9,10 @@ from weaviate.embedded import EmbeddedOptions
 
 # Load .env file
 load_dotenv()
-T = TypeVar("T", bound=BaseSettings)
+T = TypeVar("T", bound=BaseSettings)  # type: ignore
 
 
-def from_yaml(cls: Type[T], yaml_file: str) -> T:
+def from_yaml(cls: Type[T], yaml_file: str) -> T:  # type: ignore
     """Load settings from a YAML file and create an instance of the given class.
 
     Args:
@@ -24,10 +24,10 @@ def from_yaml(cls: Type[T], yaml_file: str) -> T:
     """
     with open(yaml_file, "r") as file:
         config_data = yaml.safe_load(file)
-    return cls(**config_data)
+    return cls(**config_data)  # type: ignore
 
 
-class Secrets(BaseSettings):
+class Secrets(BaseSettings):  # type: ignore
     """settings class representing OpenAI API configuration."""
 
     openai_api_key: str = Field(
@@ -48,7 +48,7 @@ class Secrets(BaseSettings):
         env_file_encoding = "utf-8"
 
 
-class AgentSettings(BaseSettings):
+class AgentSettings(BaseSettings):  # type: ignore
     """Configuration of coding agents"""
 
     planner_model: str
@@ -58,7 +58,7 @@ class AgentSettings(BaseSettings):
     linter_model: str
 
 
-class EvalSettings(BaseSettings):
+class EvalSettings(BaseSettings):  # type: ignore
     """Configuration for LLM output tracking table table"""
 
     eval_columns: List[str]
@@ -67,8 +67,8 @@ class EvalSettings(BaseSettings):
 
 secrets = Secrets()
 
-eval_settings = from_yaml(EvalSettings, "configs/eval.yaml")
-agent_settings = from_yaml(AgentSettings, "configs/agents.yaml")
+eval_settings = from_yaml(EvalSettings, "configs/eval.yaml")  # type: ignore
+agent_settings = from_yaml(AgentSettings, "configs/agents.yaml")  # type: ignore
 client = weaviate.Client(
     embedded_options=EmbeddedOptions(
         persistence_data_path=secrets.persist_dir,
