@@ -27,7 +27,7 @@ repos:
         files: src/ #ensures that mypy only checks files within the src directory.
         #pass_filenames: false #disables passing file names to mypy, allowing it to discover files on its own within the specified directory.
         language_version: python3 #sets the Python version to use for the mypy hook.
-        additional_dependencies: [toml, types-requests, types-PyYAML] # includes packages as an additional dependency for the mypy pre-commit hook.
+        additional_dependencies: [toml, types-requests, types-PyYAML, pydantic] # includes packages as an additional dependency for the mypy pre-commit hook.
 
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0  # Use the latest version of isort

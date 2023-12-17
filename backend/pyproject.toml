@@ -90,7 +90,22 @@ ensure_newline_before_comments = true
 line_length = 88
 
 [tool.mypy]
+mypy_path=["./src", "./tests"]
+plugins = [
+  "pydantic.mypy"
+]
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_reexport = true
 ignore_missing_imports = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [tool.flake8]
 exclude = ".venv"
