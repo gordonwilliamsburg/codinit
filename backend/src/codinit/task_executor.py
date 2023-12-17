@@ -20,7 +20,7 @@ from codinit.code_editor import PythonCodeEditor
 from codinit.config import client, eval_settings
 
 # from codinit.get_context import get_embedding_store, get_read_the_docs_context
-from codinit.get_context_ import get_relevant_documents
+from codinit.documentation.get_context_ import get_relevant_documents
 
 logger = logging.getLogger(__name__)
 ANSWER_PATTERN = r"[a-zA-Z]+"
@@ -259,7 +259,7 @@ class TaskExecutor:
             error=error,
             time_stamp=time_stamp,
         )
-        return error
+        return error, new_code
 
     # TODO: add plan to benchmark
     def execute_and_log(
@@ -303,8 +303,7 @@ class TaskExecutor:
             plan=plan,
             context=relevant_docs,
         )[0]
-        # TODO need to remove redundant code formatting step
-        error = self.code_correction_with_linting(
+        error, new_code = self.code_correction_with_linting(
             new_code=new_code,
             deps=deps,
             relevant_docs=relevant_docs,
@@ -317,7 +316,7 @@ class TaskExecutor:
                 break
             time_stamp = datetime.datetime.now().isoformat()
             # corrected code
-            error = self.code_correction_with_linting(
+            error, new_code = self.code_correction_with_linting(
                 new_code=new_code,
                 deps=deps,
                 relevant_docs=relevant_docs,
