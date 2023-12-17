@@ -20,7 +20,7 @@ from langchain.text_splitter import (
 from langchain.vectorstores import Chroma, Weaviate
 
 from codinit.config import Secrets, client, secrets
-from codinit.utils import download_html
+from codinit.documentation.utils import download_html
 
 retriever = WeaviateHybridSearchRetriever(
     client, index_name="LangChain_test", text_key="text"
