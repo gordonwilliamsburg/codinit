@@ -14,7 +14,13 @@ class WebScraper:
 
     def run_scraping(self, urls: List[HttpUrl]) -> List[WebScrapingData]:
         # contruct start urls models from url list
-        startUrls = [StartUrl(url=url) for url in urls]
+        startUrls = []
+        for url in urls:
+            try:
+                startUrls.append(StartUrl(url=url))
+            except ValidationError as e:
+                print(f"Invalid URL skipped: {url}. Reason: {e}")
+                continue
         # construct crawling input object
         run_input = RunInput(
             startUrls=startUrls
