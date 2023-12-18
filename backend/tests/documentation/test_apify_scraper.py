@@ -2,6 +2,7 @@ import pytest
 from codinit.documentation.apify_webscraper import WebScraper  # Adjust the import path as needed
 from apify_client import ApifyClient
 
+# a mock dataset used to simulate the data returned by the Apify client.
 mock_return_data = [
         {
         "url": "https://docs.apify.com/academy/web-scraping-for-beginners",
@@ -26,6 +27,7 @@ mock_return_data = [
         },
     ]
 
+#  a utility function used to generate the expected run_input for a given URL.
 def get_expected_run_input(url):
     return {
         'startUrls': [{'url': url}],
@@ -57,12 +59,20 @@ def get_expected_run_input(url):
         'saveScreenshots': False,
         'maxResults': 9999999
     }
+
 @pytest.fixture
 def mock_apify_client(mocker):
     mock_client = mocker.MagicMock(spec=ApifyClient)
     return mock_client
 
 def test_run_scraping_basic(mock_apify_client):
+    """
+    Basic Functionality Test
+
+    - Validates that the WebScraper correctly processes a valid URL and returns results.
+    - Ensures that the results contain expected data based on the mock return data.
+    - Confirms that the fields in the first result match the predefined values.
+    """
     mock_apify_client.actor().call.return_value = {'defaultDatasetId': 'test_dataset_id'}
     mock_apify_client.dataset().iterate_items.return_value = mock_return_data
 
@@ -95,6 +105,12 @@ def test_run_scraping_basic(mock_apify_client):
 
 
 def test_run_scraping_empty_dataset(mock_apify_client):
+    """
+    Empty Dataset Test
+
+    - Tests the scenario where the dataset returned by the Apify client is empty.
+    - Checks that the WebScraper returns an empty list when no data is available.
+    """
     mock_apify_client.actor().call.return_value = {'defaultDatasetId': 'test_dataset_id'}
     mock_apify_client.dataset().iterate_items.return_value = []
 
@@ -108,6 +124,13 @@ def test_run_scraping_empty_dataset(mock_apify_client):
 
 
 def test_run_scraping_empty_url_list(mock_apify_client):
+    """
+    Empty URL List Test (test_run_scraping_empty_url_list):
+
+    - Evaluates the behavior of the WebScraper when provided with an empty URL list.
+    - Asserts that the scraper returns an empty list for an empty input.
+    """
+
     mock_apify_client.actor().call.return_value = {'defaultDatasetId': 'test_dataset_id'}
     mock_apify_client.dataset().iterate_items.return_value = []
 
@@ -121,6 +144,14 @@ def test_run_scraping_empty_url_list(mock_apify_client):
 
 
 def test_run_scraping_with_invalid_url_handled(mock_apify_client):
+    """
+    Handling Invalid URL Test (test_run_scraping_with_invalid_url_handled):
+
+    - Verifies the scraper's ability to handle a mix of valid and invalid URLs.
+    - Confirms that the scraper skips invalid URLs and processes only the valid ones.
+    - Checks that the Apify client is called with the correct run_input for the valid URL.
+    - Ensures that the scraper returns results corresponding to the valid URL only.
+    """
     mock_apify_client.actor().call.return_value = {'defaultDatasetId': 'test_dataset_id'}
     mock_apify_client.dataset().iterate_items.return_value = mock_return_data
     scraper = WebScraper(mock_apify_client, "test_actor_id")
@@ -144,6 +175,13 @@ def test_run_scraping_with_invalid_url_handled(mock_apify_client):
 
 
 def test_run_scraping_with_valid_url(mock_apify_client):
+    """
+    Single Valid URL Test (test_run_scraping_with_valid_url):
+
+    - Assesses the scraper's functionality with a single valid URL.
+    - Ensures that the Apify client's actor and call methods are invoked correctly with the expected run_input.
+    - Confirms that the scraper returns one result for the valid URL.
+    """
     mock_apify_client.actor().call.return_value = {'defaultDatasetId': 'test_dataset_id'}
     mock_apify_client.dataset().iterate_items.return_value = mock_return_data
 
