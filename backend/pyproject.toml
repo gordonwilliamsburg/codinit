@@ -66,6 +66,7 @@ mkdocs-dracula-theme = "^1.0.4"
 [tool.poetry.group.test.dependencies]
 pytest = "^7.2.2"
 pytest-cov = "^4.0.0"
+pytest-mock = "^3.12.0"
 
 
 [tool.poetry.group.viz.dependencies]
