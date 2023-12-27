@@ -1,7 +1,7 @@
 import json
 from typing import List
 
-from pydantic import HttpUrl
+from pydantic import HttpUrl, parse_obj_as
 
 from codinit.documentation.pydantic_models import WebScrapingData
 
@@ -28,9 +28,14 @@ if __name__ == "__main__":
 
     client = ApifyClient(secrets.apify_key)
     scraper = WebScraper(client)
-    urls = [HttpUrl(url="https://docs.apify.com/academy/web-scraping-for-beginners")]
+    # TODO in pydantic v2 use TypeAdapter
+    # https://stackoverflow.com/questions/72567679/why-i-cannot-create-standalone-object-of-httpurl-in-pydantic
+    url = parse_obj_as(
+        HttpUrl, "https://docs.apify.com/academy/web-scraping-for-beginners"
+    )
+    urls = [url]
     scraped_data_models = scraper.run_scraping(urls=urls)
     for model in scraped_data_models:
         print(model.text)
-    filename = "apify_test.json"
+    filename = "/apify_test.json"
     save_scraped_data_as_json(scraped_data_models, secrets.docs_dir + filename)
