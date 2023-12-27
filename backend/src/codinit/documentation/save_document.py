@@ -28,13 +28,9 @@ if __name__ == "__main__":
 
     client = ApifyClient(secrets.apify_key)
     scraper = WebScraper(client)
-    # TODO in pydantic v2 use TypeAdapter
-    # https://stackoverflow.com/questions/72567679/why-i-cannot-create-standalone-object-of-httpurl-in-pydantic
-    url = parse_obj_as(
-        HttpUrl, "https://docs.apify.com/academy/web-scraping-for-beginners"
+    scraped_data_models = scraper.scrape_urls(
+        urls=["https://docs.apify.com/academy/web-scraping-for-beginners"]
     )
-    urls = [url]
-    scraped_data_models = scraper.run_scraping(urls=urls)
     for model in scraped_data_models:
         print(model.text)
     filename = "/apify_test.json"
