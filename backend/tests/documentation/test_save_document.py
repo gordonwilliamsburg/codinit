@@ -1,6 +1,6 @@
 import json
 import pytest
-from codinit.documentation.save_data import save_scraped_data_as_json
+from codinit.documentation.save_document import save_scraped_data_as_json
 from codinit.documentation.pydantic_models import WebScrapingData, Metadata, Crawl
 
 # fixture creates a sample WebScrapingData object for use in the test.
