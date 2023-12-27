@@ -1,5 +1,3 @@
-from codinit.config import client
-
 library_class = {
     "class": "Library",
     "description": "A code library",
@@ -38,6 +36,11 @@ documentation_file_class = {
             "description": "Description of the content of the documentation file",
         },
         {
+            "name": "chunknumber",
+            "dataType": ["int"],
+            "description": "Order of the chunk in the original documentation file",
+        },
+        {
             "name": "source",
             "dataType": ["text"],
             "description": "URL source of the documentation file",
@@ -59,6 +62,10 @@ documentation_file_class = {
         },
     ],
 }
-client.schema.delete_class("Library")
-client.schema.delete_class("DocumentionFile")
-client.schema.create({"classes": [library_class, documentation_file_class]})
+
+if __name__ == "__main__":
+    from codinit.config import client
+
+    client.schema.delete_class("Library")
+    client.schema.delete_class("DocumentionFile")
+    client.schema.create({"classes": [library_class, documentation_file_class]})
