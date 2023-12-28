@@ -65,10 +65,22 @@ class EvalSettings(BaseSettings):  # type: ignore
     eval_dataset_location: str
 
 
+class DocumentationSettings(BaseSettings):  # type: ignore
+    """Configuration for documentation generation"""
+
+    chunk_size: int
+    overlap: int
+    top_k: int
+    alpha: float
+
+
 secrets = Secrets()
 
 eval_settings = from_yaml(EvalSettings, "configs/eval.yaml")  # type: ignore
 agent_settings = from_yaml(AgentSettings, "configs/agents.yaml")  # type: ignore
+documentation_settings = from_yaml(DocumentationSettings, "configs/documentation.yaml")  # type: ignore
+
+# Create Weaviate client
 client = weaviate.Client(
     embedded_options=EmbeddedOptions(
         persistence_data_path=secrets.persist_dir,
