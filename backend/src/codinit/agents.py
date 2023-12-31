@@ -49,7 +49,7 @@ class OpenAIAgent:
             n: (o.annotation, ... if o.default == Parameter.empty else o.default)
             for n, o in inspect.signature(function).parameters.items()
         }
-        parameters = create_model(f"Input for `{function.__name__}`", **kw).schema()
+        parameters = create_model(f"Input for `{function.__name__}`", **kw).schema()  # type: ignore
         function_schema = dict(
             type="function",
             function=dict(

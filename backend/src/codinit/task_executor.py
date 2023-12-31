@@ -166,7 +166,7 @@ class TaskExecutor:
         # first get context from provided libraries
         retriever = WeaviateHybridSearchRetriever(
             client=client,
-            index_name="DocumentionFile",
+            index_name="DocumentationFile",
             text_key="content",
             k=10,
             alpha=0.75,
@@ -272,7 +272,7 @@ class TaskExecutor:
         # Generating a coding plan
         retriever = WeaviateHybridSearchRetriever(
             client=client,
-            index_name="DocumentionFile",
+            index_name="DocumentationFile",
             text_key="content",
             k=5,
             alpha=0.75,

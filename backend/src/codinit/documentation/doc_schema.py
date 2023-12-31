@@ -10,15 +10,15 @@ library_class = {
         {"name": "links", "dataType": ["text[]"]},
         {"name": "description", "dataType": ["text"]},
         {
-            "name": "hasDocumentionFile",
-            "dataType": ["DocumentionFile"],
+            "name": "hasDocumentationFile",
+            "dataType": ["DocumentationFile"],
             "description": "Documentation of the library",
         },
     ],
 }
 
 documentation_file_class = {
-    "class": "DocumentionFile",
+    "class": "DocumentationFile",
     "description": "A documentation file of a library",
     "vectorizer": "text2vec-openai",
     "moduleConfig": {
@@ -67,5 +67,5 @@ if __name__ == "__main__":
     from codinit.config import client
 
     client.schema.delete_class("Library")
-    client.schema.delete_class("DocumentionFile")
+    client.schema.delete_class("DocumentationFile")
     client.schema.create({"classes": [library_class, documentation_file_class]})

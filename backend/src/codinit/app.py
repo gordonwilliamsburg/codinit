@@ -73,7 +73,7 @@ async def generate(websocket: WebSocket):
             )
             retriever = WeaviateHybridSearchRetriever(
                 client=client,
-                index_name="DocumentionFile",
+                index_name="DocumentationFile",
                 text_key="content",
                 k=5,
                 alpha=0.75,
