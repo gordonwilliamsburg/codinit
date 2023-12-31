@@ -4,6 +4,7 @@ from typing import Tuple
 
 from codinit.code_editor import PythonCodeEditor
 from codinit.config import eval_settings
+from codinit.documentation.pydantic_models import Library
 from codinit.task_executor import TaskExecutionConfig, TaskExecutor
 
 TASKS = [
@@ -22,6 +23,11 @@ TASKS = [
     "using the langchain library, write code for an agent that writes a Jira ticket based on a conversation with the user.",
     "using the langchain library, write code for a research agent that collects papers related to a specific topic and generates a summary of the research.",
 """
+libname = "langchain"
+links = [
+    "https://langchain-langchain.vercel.app/docs/get_started/",
+]
+library = Library(libname=libname, links=links)
 
 
 def get_git_info() -> Tuple[str, str]:
@@ -68,10 +74,7 @@ def main():
                 csv_writer=writer,
             )
             print("---------new_task-----------")
-            task_executor.execute_and_log(
-                source_code="",
-                libraries=[],
-            )
+            task_executor.execute_and_log(library=library, source_code="")
 
 
 if __name__ == "__main__":

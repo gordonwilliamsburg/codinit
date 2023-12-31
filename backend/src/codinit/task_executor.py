@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple, Union
 
 import openai
 import requests
+import weaviate
 from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
 from pydantic import BaseModel
 
@@ -20,7 +21,8 @@ from codinit.code_editor import PythonCodeEditor
 from codinit.config import client, eval_settings
 
 # from codinit.get_context import get_embedding_store, get_read_the_docs_context
-from codinit.documentation.get_context_ import get_relevant_documents
+from codinit.documentation.get_context import WeaviateDocQuerier
+from codinit.documentation.pydantic_models import Library
 
 logger = logging.getLogger(__name__)
 ANSWER_PATTERN = r"[a-zA-Z]+"
@@ -162,17 +164,10 @@ class TaskExecutor:
         return relevant_docs
     """
 
-    def get_docs(self, task: str):
-        # first get context from provided libraries
-        retriever = WeaviateHybridSearchRetriever(
-            client=client,
-            index_name="DocumentationFile",
-            text_key="content",
-            k=10,
-            alpha=0.75,
-        )
-        relevant_docs = get_relevant_documents(query=task, retriever=retriever)
-        return relevant_docs
+    def get_docs(self, library: Library, task: str, client: weaviate.Client = client):
+        weaviate_doc_querier = WeaviateDocQuerier(library=library, client=client)
+        docs = weaviate_doc_querier.get_relevant_documents(query=task)
+        return docs
 
     def format_lint_code(
         self, code: str, dependencies: List[str]
@@ -264,21 +259,14 @@ class TaskExecutor:
     # TODO: add plan to benchmark
     def execute_and_log(
         self,
-        libraries: Optional[List[str]] = None,
+        library: Library,
         source_code: Optional[str] = None,
     ):
         attempt = 0
         chat_history = []
         # Generating a coding plan
-        retriever = WeaviateHybridSearchRetriever(
-            client=client,
-            index_name="DocumentationFile",
-            text_key="content",
-            k=5,
-            alpha=0.75,
-        )
         time_stamp = datetime.datetime.now().isoformat()
-        relevant_docs = get_relevant_documents(query=self.task, retriever=retriever)
+        relevant_docs = self.get_docs(library=library, task=self.task)
         # generate coding plan given context
         plan = self.planner.execute(
             tool_choice="execute_plan",
