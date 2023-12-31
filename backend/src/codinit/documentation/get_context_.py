@@ -1,217 +1,321 @@
+import logging
 import os
 import re
 from typing import List, Optional
 
 import weaviate
-from langchain.document_loaders.base import Document
-from langchain.document_loaders.recursive_url_loader import RecursiveUrlLoader
+from apify_client import ApifyClient
 from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.utilities import ApifyWrapper
 
-from codinit.config import client, secrets
-
-os.environ["APIFY_API_TOKEN"] = secrets.apify_key
-
-
-# from codinit.doc_schema import library_class, documentation_file_class
-# client.schema.create({"classes": [library_class, documentation_file_class]})
-def embed_documentation_recursiveloader(
-    libname: str,
-    links: List[str],
-    weaviate_client: weaviate.Client,
-    exclude_dirs: Optional[List[str]] = None,
-    lib_desc: Optional[str] = None,
-):
-    lib_obj = {
-        "name": libname,
-        "links": links,
-        "description": lib_desc,
-    }
-    print(lib_obj)
-    lib_id = weaviate_client.data_object.create(
-        data_object=lib_obj, class_name="Library"
-    )
-    for link in links:
-        loader = RecursiveUrlLoader(url=link, exclude_dirs=exclude_dirs)
-        docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-        )
-        docs = text_splitter.split_documents(docs)
-
-        with weaviate_client.batch() as batch:
-            for doc in docs:
-                doc
-                doc_obj = {**doc.metadata, "content": doc.page_content}
-                print(doc_obj)
-                doc_id = batch.add_data_object(
-                    data_object=doc_obj, class_name="DocumentionFile"
-                )
-                # DocumentionFile -> Library relationship
-                batch.add_reference(
-                    from_object_class_name="DocumentionFile",
-                    from_object_uuid=doc_id,
-                    from_property_name="fromLibrary",
-                    to_object_class_name="Library",
-                    to_object_uuid=lib_id,
-                )
-
-                # Library -> DocumentionFile relationship
-                batch.add_reference(
-                    from_object_class_name="Library",
-                    from_object_uuid=lib_id,
-                    from_property_name="hasDocumentionFile",
-                    to_object_class_name="DocumentionFile",
-                    to_object_uuid=doc_id,
-                )
-
-
-def embed_documentation_apify(
-    libname: str,
-    links: List[str],
-    weaviate_client: weaviate.Client,
-    exclude_dirs: Optional[List[str]] = None,
-    lib_desc: Optional[str] = None,
-    apify_key: str = secrets.apify_key,
-):
-    lib_obj = {
-        "name": libname,
-        "links": links,
-        "description": lib_desc,
-    }
-    print(lib_obj)
-    lib_id = weaviate_client.data_object.create(
-        data_object=lib_obj, class_name="Library"
-    )
-
-    # TODO: fix, must enter api_key as parameter
-    apify = ApifyWrapper()
-
-    for link in links:
-        loader = apify.call_actor(
-            actor_id="apify/website-content-crawler",
-            run_input={"startUrls": [{"url": link}]},
-            dataset_mapping_function=lambda item: Document(
-                page_content=item["text"] or "", metadata={"source": item["url"]}
-            ),
-        )
-        docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-        )
-        docs = text_splitter.split_documents(docs)
-        client.batch.configure(batch_size=10)
-        with weaviate_client.batch as batch:
-            for doc in docs:
-                doc
-                doc_obj = {**doc.metadata, "content": doc.page_content}
-                print(doc_obj)
-                doc_id = batch.add_data_object(
-                    data_object=doc_obj, class_name="DocumentionFile"
-                )
-                # DocumentionFile -> Library relationship
-                batch.add_reference(
-                    from_object_class_name="DocumentionFile",
-                    from_object_uuid=doc_id,
-                    from_property_name="fromLibrary",
-                    to_object_class_name="Library",
-                    to_object_uuid=lib_id,
-                )
-
-                # Library -> DocumentionFile relationship
-                batch.add_reference(
-                    from_object_class_name="Library",
-                    from_object_uuid=lib_id,
-                    from_property_name="hasDocumentionFile",
-                    to_object_class_name="DocumentionFile",
-                    to_object_uuid=doc_id,
-                )
-
-
-def get_retriever(
-    libname: str,
-    links: List[str],
-    weaviate_client: weaviate.Client,
-    exclude_dirs: Optional[List[str]] = None,
-    lib_desc: Optional[str] = None,
-):
-    # query if library already exists
-    result = (
-        client.query.get(
-            "Library",
-            properties=["name"],
-        )
-        .with_where({"path": ["name"], "operator": "Equal", "valueText": libname})
-        .do()
-    )
-    print(f"{result=}")
-    library_exists = result["data"]["Get"]["Library"]
-    if len(library_exists) == 0:
-        embed_documentation_apify(
-            libname=libname,
-            links=links,
-            weaviate_client=weaviate_client,
-            exclude_dirs=exclude_dirs,
-            lib_desc=lib_desc,
-        )
-    retriever = WeaviateHybridSearchRetriever(
-        client=client,
-        index_name="DocumentionFile",
-        text_key="content",
-        k=10,
-        alpha=0.75,
-    )
-    return retriever
-
-
-def get_relevant_documents(query: str, retriever: WeaviateHybridSearchRetriever):
-    # clean up query that might be produced by an LLM
-    query = query.replace("`", "").replace("'", "").replace('"', "")
-    result = re.findall(r'"(.*?)"', query)
-    if len(result) > 0:
-        query = result[0]
-    print(query)
-    docs = retriever.get_relevant_documents(query=query)
-    # print(f"{docs=}")
-    relevant_docs = ""
-    for doc in docs:
-        relevant_docs += doc.page_content
-    return relevant_docs
-
-
-libname = "langchain"
-links = [
-    "https://langchain-langchain.vercel.app/docs/get_started/",
-    "https://python.langchain.com/docs/modules/",
-    "https://python.langchain.com/docs/use_cases",
-    "https://python.langchain.com/docs/guides",
-    "https://python.langchain.com/docs/integrations",
-]
-"""
-apify = ApifyWrapper()
-for link in links:
-    #loader = RecursiveUrlLoader(url=link, exclude_dirs="")
-    loader = apify.call_actor(
-            actor_id="apify/website-content-crawler",
-            run_input={"startUrls": [{"url": link}]},
-            dataset_mapping_function=lambda item: Document(
-                page_content=item["text"] or "", metadata={"source": item["url"]}
-            ),
-        )
-    docs = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=200,
-            )
-    tiny_docs=text_splitter.split_documents(docs)
-    print(tiny_docs)
-"""
-retriever = get_retriever(libname=libname, links=links, weaviate_client=client)
-relevant_docs = get_relevant_documents(
-    query="Using the langchain library, write code that loads a user given pdf file, chunks it and then creates a summary of it.",
-    retriever=retriever,
+from codinit.config import (
+    DocumentationSettings,
+    Secrets,
+    client,
+    documentation_settings,
+    secrets,
 )
-print(relevant_docs)
+from codinit.documentation.chunk_documents import chunk_document
+from codinit.documentation.pydantic_models import Library, WebScrapingData
+from codinit.documentation.save_document import load_scraped_data_from_json
+
+
+class BaseWeaviateDocClient:
+    """
+    Base class for weaviate Documentation client.
+    """
+
+    def __init__(self, library: Library, client: weaviate.Client) -> None:
+        self.library = library
+        self.client = client
+
+    def check_library_exists(self):
+        # query if library already exists and has documentation files
+        result = (
+            self.client.query.get(
+                "Library",
+                properties=["name"],
+            )
+            .with_where(
+                {
+                    "path": ["name"],
+                    "operator": "Equal",
+                    "valueText": self.library.libname,
+                }
+            )
+            .do()
+        )
+        library_exists = result["data"]["Get"]["Library"]
+        if len(library_exists) == 0:
+            return False
+        else:
+            return True
+
+    def get_lib_id(self) -> Optional[str]:
+        object_id = None
+        result = (
+            self.client.query.get(
+                "Library",
+                properties=["name"],
+            )
+            .with_where(
+                {
+                    "path": ["name"],
+                    "operator": "Equal",
+                    "valueText": self.library.libname,
+                }
+            )
+            .with_additional(properties=["id"])
+            .do()
+        )
+        # get the id of a library from weaviate
+        if (
+            "data" in result
+            and "Get" in result["data"]
+            and "Library" in result["data"]["Get"]
+        ):
+            object_id = result["data"]["Get"]["Library"][0]["_additional"]["id"]
+        else:
+            logging.warning(f"Library ID for {self.library.libname} not found.")
+        return object_id
+
+    def check_library_has_docs(self, lib_id: str) -> int:
+        """returns number of documents associated with one library in the database"""
+        num_docs = 0
+        result = (
+            client.query.get(
+                "Library",
+                properties=[
+                    "name",
+                    "hasDocumentationFile {... on DocumentationFile {title}}",
+                ],
+            )
+            .with_where({"path": ["id"], "operator": "Equal", "valueString": lib_id})
+            .do()
+        )
+        """
+        example result = {'data': {'Get': {'Library': [{'hasDocumentationFile': None,
+            'name': 'langchain'}]}}}
+        """
+        # Check if there are associated documentation files
+        if (
+            "data" in result
+            and "Get" in result["data"]
+            and "Library" in result["data"]["Get"]
+        ):
+            library_data = result["data"]["Get"]["Library"]
+            """example library_data = [{'hasDocumentationFile': None, 'name': 'langchain'}]"""
+            if (
+                library_data
+                and library_data[0]
+                and ("hasDocumentationFile" in library_data[0])
+            ):
+                documentation_files = library_data[0]["hasDocumentationFile"]
+                if documentation_files:
+                    num_docs = len(documentation_files)
+        return num_docs
+
+
+# refactor the following document to put all functions under one class
+class WeaviateDocLoader(BaseWeaviateDocClient):
+    """
+    loads the documentation of a library and save it to weaviate.
+    """
+
+    def __init__(
+        self,
+        library: Library,
+        client: weaviate.Client = client,
+        documentation_settings: DocumentationSettings = documentation_settings,
+        secrets: Secrets = secrets,
+    ):
+        # superinit class
+        super().__init__(library=library, client=client)
+        self.documentation_settings = documentation_settings
+        self.secrets = secrets
+        self.apify_client = ApifyClient(secrets.apify_key)
+
+    def get_raw_documentation(self) -> List[WebScrapingData]:
+        """
+        get the raw documentation from json file
+        """
+        data = []
+        docs_dir = self.secrets.docs_dir
+        filename = docs_dir + "/" + self.library.libname + ".json"
+        # TODO check if all urls are present in the json file
+        if os.path.exists(filename):
+            print(f"{filename=}")
+            # load data using load_scraped_data_from_json function from codinit.documentation.save_document
+            data = load_scraped_data_from_json(filename=filename)
+        else:
+            print(f"{filename=} does not exist.")
+        return data
+
+    def chunk_doc(self, doc: WebScrapingData) -> List[str]:
+        # chunk document using chunk_document function from codinit.chunk_documents.py
+        chunks = chunk_document(
+            document=doc.text,
+            chunk_size=self.documentation_settings.chunk_size,
+            overlap=self.documentation_settings.overlap,
+        )
+        return chunks
+
+    # save document to weaviate
+    def save_doc_to_weaviate(self, doc_obj: dict, lib_id: str):
+        # TODO create hash of an object and query against object hash in library. If not found then save object.
+        doc_id = self.client.data_object.create(
+            data_object=doc_obj, class_name="DocumentationFile"
+        )
+        # DocumentationFile -> Library relationship
+        self.client.data_object.reference.add(
+            from_class_name="DocumentationFile",
+            from_uuid=doc_id,
+            from_property_name="fromLibrary",
+            to_class_name="Library",
+            to_uuid=lib_id,
+        )
+
+        # Library -> DocumentationFile relationship
+        self.client.data_object.reference.add(
+            from_class_name="Library",
+            from_uuid=lib_id,
+            from_property_name="hasDocumentationFile",
+            to_class_name="DocumentationFile",
+            to_uuid=doc_id,
+        )
+        print(f"{doc_id=}")
+
+    def save_lib_to_weaviate(self):
+        # create library object
+        lib_obj = {
+            "name": self.library.libname,
+            "links": self.library.links,
+            "description": self.library.lib_desc,
+        }
+        print(lib_obj)
+        # TODO check if lib already exists, if not, create one
+        lib_id = self.client.data_object.create(
+            data_object=lib_obj, class_name="Library"
+        )
+        print(f"{lib_id=}")
+        return lib_id
+
+    def get_or_create_library(self):
+        """
+        get or create library in weaviate
+        returns lib_id
+        """
+        # check if library already exists
+        if self.check_library_exists():
+            # get library id
+            lib_id = self.get_lib_id()
+        else:
+            # create library
+            lib_id = self.save_lib_to_weaviate()
+        return lib_id
+
+    def get_or_create_documentation(self):
+        """
+        get or create documentation in weaviate
+        returns doc_id
+        """
+        self.save_doc_to_weaviate()
+
+    # embed documentation to weaviate
+    def embed_documentation(self, data: List[WebScrapingData], lib_id: str):
+        """Chunk documents and load them to weaviate.
+
+        Args:
+            data (List[WebScrapingData]): list of WebScrapingData objects
+        """
+        # iterate over data
+        for doc in data:
+            # chunk document using chunk_document function from codinit.chunk_documents.py
+            chunks = self.chunk_doc(doc=doc)
+            # iterate over chunks, with chunk and its order in doc
+            for chunk_num, chunk in enumerate(chunks):
+                # create doc_obj of the chunk according to DocumentationFile schema
+                doc_obj = {
+                    "title": doc.metadata.title,
+                    "description": doc.metadata.description,
+                    "chunknumber": chunk_num,
+                    "source": doc.url,
+                    "language": doc.metadata.languageCode,
+                    "content": chunk,
+                }
+                # save chunk to weaviate
+                self.save_doc_to_weaviate(doc_obj=doc_obj, lib_id=lib_id)
+
+    def run(self):
+        # get or create library
+        lib_id = self.get_or_create_library()
+        data = self.get_raw_documentation()
+        if len(data) == 0:
+            print("No data found.")
+        else:
+            # embed documentation to weaviate
+            self.embed_documentation(data=data, lib_id=lib_id)
+
+
+class WeaviateDocQuerier(BaseWeaviateDocClient):
+    """
+    queries the documentation of a library from weaviate.
+    """
+
+    def __init__(
+        self,
+        library: Library,
+        client: weaviate.Client,
+        documentation_settings: DocumentationSettings = documentation_settings,
+    ) -> None:
+        super().__init__(library=library, client=client)
+        self.documentation_settings = documentation_settings
+        # create retriever
+        self.retriever = self.get_retriever()
+
+    # get retriever
+    def get_retriever(self):
+        # create retriever
+        retriever = WeaviateHybridSearchRetriever(
+            client=self.client,
+            index_name="DocumentationFile",
+            text_key="content",
+            k=self.documentation_settings.top_k,
+            alpha=self.documentation_settings.alpha,
+        )
+        return retriever
+
+    # get relevant documents for a query
+    def get_relevant_documents(self, query: str):
+        # clean up query that might be produced by an LLM
+        query = query.replace("`", "").replace("'", "").replace('"', "")
+        result = re.findall(r'"(.*?)"', query)
+        if len(result) > 0:
+            query = result[0]
+        print(query)
+        docs = self.retriever.get_relevant_documents(query=query)
+        # print(f"{docs=}")
+        relevant_docs = ""
+        for doc in docs:
+            relevant_docs += doc.page_content
+        return relevant_docs
+
+
+if __name__ == "__main__":
+    libname = "langchain"
+    links = [
+        "https://langchain-langchain.vercel.app/docs/get_started/",
+        # "https://python.langchain.com/docs/modules/",
+        # "https://python.langchain.com/docs/use_cases",
+        # "https://python.langchain.com/docs/guides",
+        # "https://python.langchain.com/docs/integrations",
+    ]
+    library = Library(libname=libname, links=links)
+    weaviate_doc_loader = WeaviateDocLoader(library=library)
+    weaviate_doc_loader.run()
+    weaviate_doc_querier = WeaviateDocQuerier(
+        library=library, client=weaviate_doc_loader.client
+    )
+    docs = weaviate_doc_querier.get_relevant_documents(
+        query="Using the langchain library, write code that illustrates usage of the library."
+    )
+    print(docs)

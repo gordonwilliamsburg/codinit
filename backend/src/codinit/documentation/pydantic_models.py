@@ -74,3 +74,11 @@ class RunInput(BaseModel):
     saveFiles: bool = Field(default=False)
     saveScreenshots: bool = Field(default=False)
     maxResults: Annotated[int, Field(gt=0)] = 9999999
+
+
+# library
+class Library(BaseModel):
+    libname: str
+    links: List[str]
+    exclude_dirs: Optional[List[str]] = None
+    lib_desc: Optional[str] = None
