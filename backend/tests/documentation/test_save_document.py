@@ -40,7 +40,7 @@ def test_save_scraped_data_as_json(mocker, sample_data):
 
     # Construct the expected JSON string
     expected_json_str = json.dumps(
-        [{"url": item.url, "text": item.text, "metadata": item.metadata.dict()} for item in sample_data],
+        [item.dict() for item in sample_data],
         ensure_ascii=False,
         indent=4
     )
