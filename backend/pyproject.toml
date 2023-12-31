@@ -53,6 +53,7 @@ types-pyyaml = "^6.0.12.8"
 pylint = "^3.0.1"
 flake8-pyproject = "^1.2.3"
 ipython = "^8.13.1"
+ipykernel = "^6.28.0"
 
 [tool.poetry.group.docs.dependencies]
 mkdocs = "^1.4.2"
