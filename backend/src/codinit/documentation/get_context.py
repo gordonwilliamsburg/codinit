@@ -165,11 +165,13 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
         filename = docs_dir + "/" + self.library.libname + ".json"
         # TODO check if all urls are present in the json file
         if os.path.exists(filename):
-            print(f"{filename=}")
+            logging.info(
+                f"Loading scraped Documentation for library {self.library.libname} from {filename=}"
+            )
             # load data using load_scraped_data_from_json function from codinit.documentation.save_document
             data = self.load_json(filename=filename)
         else:
-            print(f"{filename=} does not exist.")
+            logging.error(f"{filename=} does not exist.")
         return data
 
     def chunk_doc(self, doc: WebScrapingData) -> List[str]:
@@ -182,7 +184,7 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
         return chunks
 
     # save document to weaviate
-    def save_doc_to_weaviate(self, doc_obj: dict, lib_id: str):
+    def save_doc_to_weaviate(self, doc_obj: dict, lib_id: str) -> str:
         # TODO create hash of an object and query against object hash in library. If not found then save object.
         doc_id = self.client.data_object.create(
             data_object=doc_obj, class_name="DocumentationFile"
@@ -204,7 +206,12 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
             to_class_name="DocumentationFile",
             to_uuid=doc_id,
         )
-        print(f"{doc_id=}")
+        logging.info(
+            f"Saved document with DOC_ID {doc_id=} to library with LIB_ID {lib_id=}"
+        )
+        return doc_id
+
+    # save library to weaviate
 
     def save_lib_to_weaviate(self):
         # create library object
@@ -234,12 +241,13 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
             lib_id = self.save_lib_to_weaviate()
         return lib_id
 
-    def get_or_create_documentation(self):
+    def get_or_create_documentation(self, doc_obj: dict, lib_id: str):
         """
         get or create documentation in weaviate
         returns doc_id
         """
-        self.save_doc_to_weaviate()
+        doc_id = self.save_doc_to_weaviate(doc_obj=doc_obj, lib_id=lib_id)
+        return doc_id
 
     # embed documentation to weaviate
     def embed_documentation(self, data: List[WebScrapingData], lib_id: str):
@@ -264,7 +272,14 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
                     "content": chunk,
                 }
                 # save chunk to weaviate
-                self.save_doc_to_weaviate(doc_obj=doc_obj, lib_id=lib_id)
+                doc_id = self.get_or_create_documentation(
+                    doc_obj=doc_obj, lib_id=lib_id
+                )
+                logging.info(
+                    f"Processed loading for chunk document with DOC_ID {doc_id=}"
+                )
+
+    # run
 
     def run(self):
         # get or create library
