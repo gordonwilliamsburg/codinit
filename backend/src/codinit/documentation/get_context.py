@@ -24,7 +24,7 @@ class BaseWeaviateDocClient:
     Base class for weaviate Documentation client.
     """
 
-    def __init__(self, library: Library, client: weaviate.Client) -> None:
+    def __init__(self, library: Library, client: weaviate.Client = client) -> None:
         self.library = library
         self.client = client
 
@@ -72,9 +72,15 @@ class BaseWeaviateDocClient:
             "data" in result
             and "Get" in result["data"]
             and "Library" in result["data"]["Get"]
+            and len(result["data"]["Get"]["Library"])
+            > 0  # case where library exists at least once
         ):
+            if len(result["data"]["Get"]["Library"]) > 1:
+                logging.warning(
+                    f"More than one library with name {self.library.libname} found, returning first one."
+                )
             object_id = result["data"]["Get"]["Library"][0]["_additional"]["id"]
-        else:
+        else:  # case where result is {'data': {'Get': {'Library': []}}}
             logging.warning(f"Library ID for {self.library.libname} not found.")
         return object_id
 
@@ -82,7 +88,7 @@ class BaseWeaviateDocClient:
         """returns number of documents associated with one library in the database"""
         num_docs = 0
         result = (
-            client.query.get(
+            self.client.query.get(
                 "Library",
                 properties=[
                     "name",
@@ -92,9 +98,12 @@ class BaseWeaviateDocClient:
             .with_where({"path": ["id"], "operator": "Equal", "valueString": lib_id})
             .do()
         )
+        print(f"{result=}")
+        # get the number of documentation files associated with a library"
         """
-        example result = {'data': {'Get': {'Library': [{'hasDocumentationFile': None,
+        1. example, no docs exist:  result = {'data': {'Get': {'Library': [{'hasDocumentationFile': None,
             'name': 'langchain'}]}}}
+        2. example, multiple docs exist: result = {'data': {'Get': {'Library': [{'hasDocumentationFile': [{'title': 'title1'}, {'title': 'title2'}], 'name': 'langchain'}]}}}
         """
         # Check if there are associated documentation files
         if (
@@ -103,7 +112,11 @@ class BaseWeaviateDocClient:
             and "Library" in result["data"]["Get"]
         ):
             library_data = result["data"]["Get"]["Library"]
-            """example library_data = [{'hasDocumentationFile': None, 'name': 'langchain'}]"""
+            print(f"{library_data=}")
+            """
+            1. example, no docs exist: library_data = [{'hasDocumentationFile': None, 'name': 'langchain'}]
+            2. example, multiple docs exist: library_data = [{'hasDocumentationFile': [{'title': 'title1'}, {'title': 'title2'}], 'name': 'langchain'}]
+            """
             if (
                 library_data
                 and library_data[0]
@@ -112,6 +125,12 @@ class BaseWeaviateDocClient:
                 documentation_files = library_data[0]["hasDocumentationFile"]
                 if documentation_files:
                     num_docs = len(documentation_files)
+                else:
+                    logging.warning(
+                        f"Library with ID {lib_id} has no documentation files."
+                    )
+            else:  # case where result={'data': {'Get': {'Library': []}}}
+                logging.error(f"Error getting library with ID {lib_id} from weaviate.")
         return num_docs
 
 
@@ -310,11 +329,15 @@ if __name__ == "__main__":
     ]
     library = Library(libname=libname, links=links)
     weaviate_doc_loader = WeaviateDocLoader(library=library)
-    weaviate_doc_loader.run()
+    # weaviate_doc_loader.run()
+    """
     weaviate_doc_querier = WeaviateDocQuerier(
         library=library, client=weaviate_doc_loader.client
     )
     docs = weaviate_doc_querier.get_relevant_documents(
         query="Using the langchain library, write code that illustrates usage of the library."
     )
-    print(docs)
+    print(docs)"""
+    print(weaviate_doc_loader.get_lib_id())
+    num_docs = weaviate_doc_loader.check_library_has_docs(lib_id="some_id")
+    print(num_docs)
