@@ -153,6 +153,9 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
         self.secrets = secrets
         self.apify_client = ApifyClient(secrets.apify_key)
 
+    def load_json(self, filename: str) -> List[WebScrapingData]:
+        return load_scraped_data_from_json(filename=filename)
+
     def get_raw_documentation(self) -> List[WebScrapingData]:
         """
         get the raw documentation from json file
@@ -164,7 +167,7 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
         if os.path.exists(filename):
             print(f"{filename=}")
             # load data using load_scraped_data_from_json function from codinit.documentation.save_document
-            data = load_scraped_data_from_json(filename=filename)
+            data = self.load_json(filename=filename)
         else:
             print(f"{filename=} does not exist.")
         return data
