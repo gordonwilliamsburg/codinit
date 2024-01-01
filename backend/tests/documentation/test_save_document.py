@@ -1,34 +1,6 @@
 import json
-import pytest
 from codinit.documentation.save_document import save_scraped_data_as_json
-from codinit.documentation.pydantic_models import WebScrapingData, Metadata, Crawl
 
-# fixture creates a sample WebScrapingData object for use in the test.
-@pytest.fixture
-def sample_data():
-    return [
-        WebScrapingData(
-            url="https://example.com",
-            text="Example text",
-            metadata=Metadata(
-                canonicalUrl="https://example.com",
-                title="Example Title",
-                description="Example Description",
-                author="Author Name",
-                keywords="keywords",
-                languageCode="en"
-            ),
-            crawl=Crawl(
-                loadedUrl="https://example.com",
-                loadedTime="2021-01-01T00:00:00Z",
-                referrerUrl="https://referrer.com",
-                depth=1
-            ),
-            screenshotUrl="https://example.com/screenshot.png",
-            html="<html></html>",
-            markdown="## Example Markdown"
-        )
-    ]
 
 def test_save_scraped_data_as_json(mocker, sample_data):
     # use mocker.patch to mock the built-in open function

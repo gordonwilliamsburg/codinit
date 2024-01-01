@@ -60,10 +60,6 @@ def get_expected_run_input(url):
         'maxResults': 9999999
     }
 
-@pytest.fixture
-def mock_apify_client(mocker):
-    mock_client = mocker.MagicMock(spec=ApifyClient)
-    return mock_client
 
 def test_run_scraping_basic(mock_apify_client):
     """

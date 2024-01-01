@@ -1,18 +1,7 @@
-import pytest
 from codinit.documentation.get_context import BaseWeaviateDocClient
-from codinit.documentation.pydantic_models import Library
 import weaviate
 import logging
 
-@pytest.fixture
-def mock_library():
-    libname = "langchain"
-    links = [
-        "https://langchain-langchain.vercel.app/docs/get_started/",
-        "https://python.langchain.com/docs/modules/"
-    ]
-    library = Library(libname=libname, links=links)
-    return library
 
 def test_check_library_exists_true(mock_library, mocker):
     # Create a mock for the client
