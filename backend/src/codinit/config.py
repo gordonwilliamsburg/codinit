@@ -1,11 +1,9 @@
 import os
 from typing import List, Type, TypeVar
 
-import weaviate
 import yaml
 from dotenv import load_dotenv
 from pydantic import BaseSettings, Field
-from weaviate.embedded import EmbeddedOptions
 
 # Load .env file
 load_dotenv()
@@ -79,17 +77,3 @@ secrets = Secrets()
 eval_settings = from_yaml(EvalSettings, "configs/eval.yaml")  # type: ignore
 agent_settings = from_yaml(AgentSettings, "configs/agents.yaml")  # type: ignore
 documentation_settings = from_yaml(DocumentationSettings, "configs/documentation.yaml")  # type: ignore
-
-# Create Weaviate client
-client = weaviate.Client(
-    embedded_options=EmbeddedOptions(
-        persistence_data_path=secrets.persist_dir,
-        additional_env_vars={
-            "ENABLE_MODULES": "text2vec-openai,text2vec-cohere,text2vec-huggingface,ref2vec-centroid,generative-openai,qna-openai"
-        },
-    ),
-    additional_headers={
-        "X-HuggingFace-Api-Key": secrets.huggingface_key,
-        "X-OpenAI-Api-Key": secrets.openai_api_key,
-    },
-)

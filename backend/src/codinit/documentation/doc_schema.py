@@ -64,7 +64,9 @@ documentation_file_class = {
 }
 
 if __name__ == "__main__":
-    from codinit.config import client
+    from codinit.weaviate_client import get_weaviate_client
+
+    client = get_weaviate_client()
 
     client.schema.delete_class("Library")
     client.schema.delete_class("DocumentationFile")

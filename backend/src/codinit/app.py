@@ -9,10 +9,11 @@ from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetr
 from pydantic import BaseModel
 
 from codinit.code_editor import PythonCodeEditor
-from codinit.config import client, eval_settings
+from codinit.config import eval_settings
 from codinit.documentation.pydantic_models import Library
 from codinit.main import get_git_info
 from codinit.task_executor import TaskExecutionConfig, TaskExecutor
+from codinit.weaviate_client import get_weaviate_client
 
 app = FastAPI()
 origins = [
@@ -77,7 +78,10 @@ async def generate(websocket: WebSocket):
                 csv_writer=writer,
             )
             time_stamp = datetime.datetime.now().isoformat()
-            relevant_docs = task_executor.get_docs(library=library, task=task)
+            client = get_weaviate_client()
+            relevant_docs = task_executor.get_docs(
+                library=library, task=task, client=client
+            )
             plan = task_executor.planner.execute(
                 tool_choice="execute_plan",
                 chat_history=[],

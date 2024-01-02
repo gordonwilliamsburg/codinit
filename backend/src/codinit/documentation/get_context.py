@@ -10,13 +10,13 @@ from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetr
 from codinit.config import (
     DocumentationSettings,
     Secrets,
-    client,
     documentation_settings,
     secrets,
 )
 from codinit.documentation.chunk_documents import chunk_document
 from codinit.documentation.pydantic_models import Library, WebScrapingData
 from codinit.documentation.save_document import load_scraped_data_from_json
+from codinit.weaviate_client import get_weaviate_client
 
 
 class BaseWeaviateDocClient:
@@ -24,7 +24,7 @@ class BaseWeaviateDocClient:
     Base class for weaviate Documentation client.
     """
 
-    def __init__(self, library: Library, client: weaviate.Client = client) -> None:
+    def __init__(self, library: Library, client: weaviate.Client) -> None:
         self.library = library
         self.client = client
 
@@ -143,7 +143,7 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
     def __init__(
         self,
         library: Library,
-        client: weaviate.Client = client,
+        client: weaviate.Client,
         documentation_settings: DocumentationSettings = documentation_settings,
         secrets: Secrets = secrets,
     ):
@@ -345,8 +345,9 @@ if __name__ == "__main__":
         # "https://python.langchain.com/docs/guides",
         # "https://python.langchain.com/docs/integrations",
     ]
+    client = get_weaviate_client()
     library = Library(libname=libname, links=links)
-    weaviate_doc_loader = WeaviateDocLoader(library=library)
+    weaviate_doc_loader = WeaviateDocLoader(library=library, client=client)
     # weaviate_doc_loader.run()
     """
     weaviate_doc_querier = WeaviateDocQuerier(

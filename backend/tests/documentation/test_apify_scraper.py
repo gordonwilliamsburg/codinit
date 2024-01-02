@@ -1,6 +1,5 @@
-import pytest
+
 from codinit.documentation.apify_webscraper import WebScraper  # Adjust the import path as needed
-from apify_client import ApifyClient
 
 # a mock dataset used to simulate the data returned by the Apify client.
 mock_return_data = [

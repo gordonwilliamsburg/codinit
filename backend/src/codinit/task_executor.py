@@ -18,11 +18,12 @@ from codinit.agents import (
     planner_agent,
 )
 from codinit.code_editor import PythonCodeEditor
-from codinit.config import client, eval_settings
+from codinit.config import eval_settings
 
 # from codinit.get_context import get_embedding_store, get_read_the_docs_context
 from codinit.documentation.get_context import WeaviateDocQuerier
 from codinit.documentation.pydantic_models import Library
+from codinit.weaviate_client import get_weaviate_client
 
 logger = logging.getLogger(__name__)
 ANSWER_PATTERN = r"[a-zA-Z]+"
@@ -164,7 +165,7 @@ class TaskExecutor:
         return relevant_docs
     """
 
-    def get_docs(self, library: Library, task: str, client: weaviate.Client = client):
+    def get_docs(self, library: Library, task: str, client: weaviate.Client):
         weaviate_doc_querier = WeaviateDocQuerier(library=library, client=client)
         docs = weaviate_doc_querier.get_relevant_documents(query=task)
         return docs
@@ -262,11 +263,12 @@ class TaskExecutor:
         library: Library,
         source_code: Optional[str] = None,
     ):
+        client = get_weaviate_client()
         attempt = 0
         chat_history = []
         # Generating a coding plan
         time_stamp = datetime.datetime.now().isoformat()
-        relevant_docs = self.get_docs(library=library, task=self.task)
+        relevant_docs = self.get_docs(library=library, task=self.task, client=client)
         # generate coding plan given context
         plan = self.planner.execute(
             tool_choice="execute_plan",
