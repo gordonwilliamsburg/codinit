@@ -3,20 +3,23 @@ import os
 from codinit.documentation.get_context import WeaviateDocLoader
 import weaviate
 import pytest
-from unittest.mock import Mock, mock_open
+from unittest.mock import Mock, mock_open, call
 from unittest.mock import patch
 
 # Create a fixture to mock the weaviate.Client object
 @pytest.fixture
 def mock_client():
+    """
+    A mock of the Weaviate client's interactions. Specifically, will mock the create and reference.add methods of the data_object attribute of the Weaviate client.
+    This will allow to verify that the method correctly saves a document and establishes the necessary relationships in Weaviate.
+    """
     # Create a mock of the weaviate.Client
     client = Mock(spec=weaviate.Client)
 
-    # Mock any methods or properties of the client that are used in your tests
-    # For example:
     client.data_object = Mock()
+    client.data_object.create = Mock()
     client.data_object.reference = Mock()
-
+    client.data_object.reference.add = Mock()
     return client
 
 def test_weaviate_doc_loader_initialization(mock_client, mock_documentation_settings, mock_library, mock_secrets):
@@ -99,3 +102,70 @@ def test_chunk_doc(mock_library, mock_client, mock_documentation_settings, mock_
 
         # Assert that the returned chunks match the mock return value
         assert result == ["chunk1", "chunk2"]
+
+def test_save_doc_to_weaviate(mock_library, mock_client, mock_documentation_settings, mock_secrets):
+    # Initialize WeaviateDocLoader
+    doc_loader = WeaviateDocLoader(
+        library=mock_library,
+        client=mock_client,
+        documentation_settings=mock_documentation_settings,
+        secrets=mock_secrets
+    )
+
+    # Create a mock document object and a mock library ID
+    mock_doc_obj = {"some": "data"}
+    mock_lib_id = "mock_lib_id"
+    mock_doc_id = "mock_doc_id"
+
+    # Mock the Weaviate client's create and reference.add methods
+    mock_client.data_object.create.return_value = mock_doc_id
+
+    # Call save_doc_to_weaviate methood
+    doc_loader.save_doc_to_weaviate(doc_obj=mock_doc_obj, lib_id=mock_lib_id)
+
+    # Assert that create was called correctly
+    mock_client.data_object.create.assert_called_once_with(
+        data_object=mock_doc_obj, class_name="DocumentationFile"
+    )
+
+    # Assert that reference.add was called correctly for both relationships
+    calls = [
+        call(
+            from_class_name="DocumentationFile",
+            from_uuid=mock_doc_id,
+            from_property_name="fromLibrary",
+            to_class_name="Library",
+            to_uuid=mock_lib_id,
+        ),
+        call(
+            from_class_name="Library",
+            from_uuid=mock_lib_id,
+            from_property_name="hasDocumentationFile",
+            to_class_name="DocumentationFile",
+            to_uuid=mock_doc_id,
+        )
+    ]
+    mock_client.data_object.reference.add.assert_has_calls(calls, any_order=True)
+
+def test_weaviate_doc_loader_integration(test_embedded_weaviate_client, mock_library, mock_documentation_settings, mock_secrets, sample_data):
+    # Initialize WeaviateDocLoader
+    doc_loader = WeaviateDocLoader(
+        library=mock_library,
+        client=test_embedded_weaviate_client,
+        documentation_settings=mock_documentation_settings,
+        secrets=mock_secrets
+    )
+    # Example operation: Create or get a library
+    lib_id = doc_loader.get_or_create_library()
+    # Example operation: Embed documentation
+    doc_loader.embed_documentation(data=[sample_data], lib_id=lib_id)
+
+    # Perform assertions or verifications
+    # Example: Retrieve and verify the saved document from Weaviate
+    query_result = test_embedded_weaviate_client.query.get('Library', properties=['name', 'hasDocumentationFile']).do()
+    assert any(lib['name'] == "TestLibrary" for lib in query_result['data']['Get']['Library'])
+
+    #query_result = test_embedded_weaviate_client.query.get('DocumentationFile', properties=['fromLibrary']).do()
+    #assert any(doc['fromLibrary'] == lib_id for doc in query_result['data']['Get']['DocumentationFile'])
+
+# TODO test that the given doc adheres to the weaviate schema
