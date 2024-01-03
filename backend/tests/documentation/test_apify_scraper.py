@@ -1,6 +1,5 @@
-import pytest
+
 from codinit.documentation.apify_webscraper import WebScraper  # Adjust the import path as needed
-from apify_client import ApifyClient
 
 # a mock dataset used to simulate the data returned by the Apify client.
 mock_return_data = [
@@ -60,10 +59,6 @@ def get_expected_run_input(url):
         'maxResults': 9999999
     }
 
-@pytest.fixture
-def mock_apify_client(mocker):
-    mock_client = mocker.MagicMock(spec=ApifyClient)
-    return mock_client
 
 def test_run_scraping_basic(mock_apify_client):
     """

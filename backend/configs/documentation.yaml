@@ -1,0 +1,4 @@
+chunk_size: 1000
+overlap: 200
+alpha: 0.75
+top_k: 10

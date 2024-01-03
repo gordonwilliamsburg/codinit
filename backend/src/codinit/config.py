@@ -1,11 +1,8 @@
-import os
 from typing import List, Type, TypeVar
 
-import weaviate
 import yaml
 from dotenv import load_dotenv
 from pydantic import BaseSettings, Field
-from weaviate.embedded import EmbeddedOptions
 
 # Load .env file
 load_dotenv()
@@ -30,21 +27,14 @@ def from_yaml(cls: Type[T], yaml_file: str) -> T:  # type: ignore
 class Secrets(BaseSettings):  # type: ignore
     """settings class representing OpenAI API configuration."""
 
-    openai_api_key: str = Field(
-        "" if os.getenv("TESTING") else ..., env="OPENAI_API_KEY"
-    )
-    huggingface_key: str = Field(
-        "" if os.getenv("TESTING") else ..., env="HUGGINGFACE_KEY"
-    )
-    persist_dir: str = Field("" if os.getenv("TESTING") else ..., env="PERSIST_DIR")
-    model_path: str = Field("" if os.getenv("TESTING") else ..., env="MODEL_PATH")
-    repo_path: str = Field("" if os.getenv("TESTING") else ..., env="REPO_DIR")
-    docs_dir: str = Field("" if os.getenv("TESTING") else ..., env="DOCS_DIR")
-    weaviate_url: str = Field("" if os.getenv("TESTING") else ..., env="WEAVIATE_URL")
-    apify_key: str = Field("" if os.getenv("TESTING") else ..., env="APIFY_KEY")
+    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    huggingface_key: str = Field(..., env="HUGGINGFACE_KEY")
+    persist_dir: str = Field(..., env="PERSIST_DIR")
+    docs_dir: str = Field(..., env="DOCS_DIR")
+    apify_key: str = Field(..., env="APIFY_KEY")
 
     class Config:
-        env_file = ".env"
+        env_file = "prod.env"
         env_file_encoding = "utf-8"
 
 
@@ -65,19 +55,17 @@ class EvalSettings(BaseSettings):  # type: ignore
     eval_dataset_location: str
 
 
+class DocumentationSettings(BaseSettings):  # type: ignore
+    """Configuration for documentation generation"""
+
+    chunk_size: int
+    overlap: int
+    top_k: int
+    alpha: float
+
+
 secrets = Secrets()
 
 eval_settings = from_yaml(EvalSettings, "configs/eval.yaml")  # type: ignore
 agent_settings = from_yaml(AgentSettings, "configs/agents.yaml")  # type: ignore
-client = weaviate.Client(
-    embedded_options=EmbeddedOptions(
-        persistence_data_path=secrets.persist_dir,
-        additional_env_vars={
-            "ENABLE_MODULES": "text2vec-openai,text2vec-cohere,text2vec-huggingface,ref2vec-centroid,generative-openai,qna-openai"
-        },
-    ),
-    additional_headers={
-        "X-HuggingFace-Api-Key": secrets.huggingface_key,
-        "X-OpenAI-Api-Key": secrets.openai_api_key,
-    },
-)
+documentation_settings = from_yaml(DocumentationSettings, "configs/documentation.yaml")  # type: ignore

@@ -1,5 +1,3 @@
-from codinit.config import client
-
 library_class = {
     "class": "Library",
     "description": "A code library",
@@ -12,15 +10,15 @@ library_class = {
         {"name": "links", "dataType": ["text[]"]},
         {"name": "description", "dataType": ["text"]},
         {
-            "name": "hasDocumentionFile",
-            "dataType": ["DocumentionFile"],
+            "name": "hasDocumentationFile",
+            "dataType": ["DocumentationFile"],
             "description": "Documentation of the library",
         },
     ],
 }
 
 documentation_file_class = {
-    "class": "DocumentionFile",
+    "class": "DocumentationFile",
     "description": "A documentation file of a library",
     "vectorizer": "text2vec-openai",
     "moduleConfig": {
@@ -36,6 +34,11 @@ documentation_file_class = {
             "name": "description",
             "dataType": ["text"],
             "description": "Description of the content of the documentation file",
+        },
+        {
+            "name": "chunknumber",
+            "dataType": ["int"],
+            "description": "Order of the chunk in the original documentation file",
         },
         {
             "name": "source",
@@ -59,6 +62,12 @@ documentation_file_class = {
         },
     ],
 }
-client.schema.delete_class("Library")
-client.schema.delete_class("DocumentionFile")
-client.schema.create({"classes": [library_class, documentation_file_class]})
+
+if __name__ == "__main__":
+    from codinit.weaviate_client import get_weaviate_client
+
+    client = get_weaviate_client()
+
+    client.schema.delete_class("Library")
+    client.schema.delete_class("DocumentationFile")
+    # client.schema.create({"classes": [library_class, documentation_file_class]})

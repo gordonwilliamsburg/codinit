@@ -5,14 +5,14 @@ from typing import List
 
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
 from pydantic import BaseModel
 
 from codinit.code_editor import PythonCodeEditor
-from codinit.config import client, eval_settings
-from codinit.documentation.get_context_ import get_relevant_documents
+from codinit.config import eval_settings
+from codinit.documentation.pydantic_models import Library
 from codinit.main import get_git_info
 from codinit.task_executor import TaskExecutionConfig, TaskExecutor
+from codinit.weaviate_client import get_weaviate_client
 
 app = FastAPI()
 origins = [
@@ -51,6 +51,11 @@ async def generate(websocket: WebSocket):
         print(item.libraries)
         print(item.prompt)
         print(item.source_code)
+        libname = "langchain"
+        links = [
+            "https://langchain-langchain.vercel.app/docs/get_started/",
+        ]
+        library = Library(libname=libname, links=links)
         sha, message = get_git_info()
         with open(eval_settings.eval_dataset_location, "a+", newline="") as csvfile:
             fieldnames = [fieldname for fieldname in eval_settings.eval_columns]
@@ -71,15 +76,11 @@ async def generate(websocket: WebSocket):
                 message=message,
                 csv_writer=writer,
             )
-            retriever = WeaviateHybridSearchRetriever(
-                client=client,
-                index_name="DocumentionFile",
-                text_key="content",
-                k=5,
-                alpha=0.75,
-            )
             time_stamp = datetime.datetime.now().isoformat()
-            relevant_docs = get_relevant_documents(query=task, retriever=retriever)
+            client = get_weaviate_client()
+            relevant_docs = task_executor.get_docs(
+                library=library, task=task, client=client
+            )
             plan = task_executor.planner.execute(
                 tool_choice="execute_plan",
                 chat_history=[],
