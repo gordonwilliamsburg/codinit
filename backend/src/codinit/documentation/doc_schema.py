@@ -70,4 +70,4 @@ if __name__ == "__main__":
 
     client.schema.delete_class("Library")
     client.schema.delete_class("DocumentationFile")
-    client.schema.create({"classes": [library_class, documentation_file_class]})
+    # client.schema.create({"classes": [library_class, documentation_file_class]})

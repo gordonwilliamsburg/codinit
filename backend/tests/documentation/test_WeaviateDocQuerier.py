@@ -20,6 +20,9 @@ def mock_client():
     client.data_object.create = Mock()
     client.data_object.reference = Mock()
     client.data_object.reference.add = Mock()
+    client.schema = Mock()
+    client.schema.get= Mock(return_value= {'classes': [library_class, documentation_file_class]})
+    client.schema.create= Mock()
     return client
 
 def test_weaviate_doc_loader_initialization(mock_client, mock_documentation_settings, mock_library, mock_secrets):
@@ -148,7 +151,6 @@ def test_save_doc_to_weaviate(mock_library, mock_client, mock_documentation_sett
     mock_client.data_object.reference.add.assert_has_calls(calls, any_order=True)
 
 def test_weaviate_doc_loader_integration(test_embedded_weaviate_client, mock_library, mock_documentation_settings, mock_secrets, sample_data):
-    test_embedded_weaviate_client.schema.create({"classes": [library_class, documentation_file_class]})
     # Initialize WeaviateDocLoader
     doc_loader = WeaviateDocLoader(
         library=mock_library,
@@ -159,12 +161,12 @@ def test_weaviate_doc_loader_integration(test_embedded_weaviate_client, mock_lib
     # Example operation: Create or get a library
     lib_id = doc_loader.get_or_create_library()
     # Example operation: Embed documentation
-    doc_loader.embed_documentation(data=[sample_data], lib_id=lib_id)
+    doc_loader.embed_documentation(data=sample_data, lib_id=lib_id)
 
     # Perform assertions or verifications
     # Example: Retrieve and verify the saved document from Weaviate
     query_result = test_embedded_weaviate_client.query.get('Library', properties=['name', 'hasDocumentationFile']).do()
-    assert any(lib['name'] == "TestLibrary" for lib in query_result['data']['Get']['Library'])
+    assert any(lib['name'] == "langchain" for lib in query_result['data']['Get']['Library'])
 
     #query_result = test_embedded_weaviate_client.query.get('DocumentationFile', properties=['fromLibrary']).do()
     #assert any(doc['fromLibrary'] == lib_id for doc in query_result['data']['Get']['DocumentationFile'])

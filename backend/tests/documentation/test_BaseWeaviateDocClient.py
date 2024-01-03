@@ -1,14 +1,23 @@
-from codinit.documentation.get_context import BaseWeaviateDocClient
+from codinit.documentation.get_context import BaseWeaviateDocClient#
+from codinit.documentation.doc_schema import library_class, documentation_file_class
 import weaviate
 import logging
+import pytest
 
-
-def test_check_library_exists_true(mock_library, mocker):
+@pytest.fixture()
+def mock_client(mocker):
     # Create a mock for the client
     mock_client = mocker.Mock(spec=weaviate.Client)
 
+    mock_client.schema = mocker.Mock()
+    mock_client.schema.get= mocker.Mock(return_value= {'classes': [library_class, documentation_file_class]})
+    mock_client.schema.create= mocker.Mock()
+
     # Mocking the chain with appropriate return values
     mock_client.query = mocker.Mock()
+    return mock_client
+
+def test_check_library_exists_true(mock_library, mock_client, mocker):
 
     # Set a return value for the scenario being tested
     mock_result = {"data": {"Get": {"Library": [{"name": "langchain"}]}}}
@@ -23,13 +32,7 @@ def test_check_library_exists_true(mock_library, mocker):
     # Assert
     assert result is True
 
-def test_check_library_exists_false(mock_library, mocker):
-    # Create a mock for the client
-    mock_client = mocker.Mock(spec=weaviate.Client)
-
-    # Mocking the chain with appropriate return values
-    mock_client.query = mocker.Mock()
-
+def test_check_library_exists_false(mock_library, mock_client, mocker):
     # Set a return value for the scenario being tested
     mock_result = {'data': {'Get': {'Library': []}}}
     mock_client.query.get().with_where().do = mocker.Mock(return_value=mock_result)
@@ -43,10 +46,8 @@ def test_check_library_exists_false(mock_library, mocker):
     # Assert
     assert result is False
 
-def test_get_lib_id_found(mock_library, mocker):
+def test_get_lib_id_found(mock_library, mock_client, mocker):
     # Arrange the mock client to return an ID
-    mock_client = mocker.Mock(spec=weaviate.Client)
-    mock_client.query = mocker.Mock()
     mock_result = {'data': {'Get': {'Library': [{'name': 'langchain', '_additional': {'id': '1234567890'}}]}}}
     mock_client.query.get().with_where().with_additional().do = mocker.Mock(return_value=mock_result)
 
@@ -61,10 +62,8 @@ def test_get_lib_id_found(mock_library, mocker):
 
 
 
-def test_get_lib_id_multiple_found(mock_library, mocker):
+def test_get_lib_id_multiple_found(mock_library, mock_client, mocker):
     # Arrange the mock client to return multiple IDs
-    mock_client = mocker.Mock(spec=weaviate.Client)
-    mock_client.query = mocker.Mock()
     mock_result = {'data': {'Get': {'Library': [{'name': 'langchain', '_additional': {'id': '1234567890'}}, {'name': 'langchain', '_additional': {'id': '9876543210'}}]}}}
     mock_client.query.get().with_where().with_additional().do = mocker.Mock(return_value=mock_result)
 
@@ -78,10 +77,8 @@ def test_get_lib_id_multiple_found(mock_library, mocker):
     assert result == '1234567890'
 
 
-def test_get_lib_id_not_found(mock_library, mocker):
+def test_get_lib_id_not_found(mock_library, mock_client, mocker):
     # Arrange the mock client to return no ID
-    mock_client = mocker.Mock(spec=weaviate.Client)
-    mock_client.query = mocker.Mock()
     mock_result = {'data': {'Get': {'Library': []}}}
     mock_client.query.get().with_where().with_additional().do = mocker.Mock(return_value=mock_result)
 
@@ -96,10 +93,8 @@ def test_get_lib_id_not_found(mock_library, mocker):
 
 
 
-def test_check_library_has_no_docs(mock_library, mocker, caplog):
+def test_check_library_has_no_docs(mock_library, mock_client, mocker, caplog):
     # Mock client setup
-    mock_client = mocker.Mock(spec=weaviate.Client)
-    mock_client.query = mocker.Mock()
     mock_result = {'data': {'Get': {'Library': [{'hasDocumentationFile': None, 'name': 'langchain'}]}}}
     mock_client.query.get().with_where().do = mocker.Mock(return_value=mock_result)
 
@@ -115,10 +110,7 @@ def test_check_library_has_no_docs(mock_library, mocker, caplog):
         assert 'Library with ID lib_with_no_docs_id has no documentation files.' in caplog.text
 
 
-def test_check_library_has_multiple_docs(mock_library, mocker):
-    # Mock client setup
-    mock_client = mocker.Mock(spec=weaviate.Client)
-    mock_client.query = mocker.Mock()
+def test_check_library_has_multiple_docs(mock_library, mock_client, mocker):
 
     # Correct mock result
     mock_result = {
@@ -143,10 +135,8 @@ def test_check_library_has_multiple_docs(mock_library, mocker):
     # Assert
     assert num_docs == 2
 
-def test_check_library_has_no_docs_with_nonexistent_library(mock_library, mocker, caplog):
+def test_check_library_has_no_docs_with_nonexistent_library(mock_library, mock_client, mocker, caplog):
     # Mock client setup
-    mock_client = mocker.Mock(spec=weaviate.Client)
-    mock_client.query = mocker.Mock()
     mock_client.query.get().with_where().do.return_value = {'data': {'Get': {'Library': []}}}
 
     client = BaseWeaviateDocClient(library=mock_library, client=mock_client)

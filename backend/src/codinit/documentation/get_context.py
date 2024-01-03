@@ -14,9 +14,14 @@ from codinit.config import (
     secrets,
 )
 from codinit.documentation.chunk_documents import chunk_document
+from codinit.documentation.doc_schema import documentation_file_class, library_class
 from codinit.documentation.pydantic_models import Library, WebScrapingData
 from codinit.documentation.save_document import load_scraped_data_from_json
 from codinit.weaviate_client import get_weaviate_client
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 class BaseWeaviateDocClient:
@@ -27,6 +32,7 @@ class BaseWeaviateDocClient:
     def __init__(self, library: Library, client: weaviate.Client) -> None:
         self.library = library
         self.client = client
+        self.init_schema()
 
     def check_library_exists(self):
         # query if library already exists and has documentation files
@@ -98,7 +104,9 @@ class BaseWeaviateDocClient:
             .with_where({"path": ["id"], "operator": "Equal", "valueString": lib_id})
             .do()
         )
-        print(f"{result=}")
+        logging.debug(
+            f"Querying documentation for library with ID {lib_id} gives {result=}"
+        )
         # get the number of documentation files associated with a library"
         """
         1. example, no docs exist:  result = {'data': {'Get': {'Library': [{'hasDocumentationFile': None,
@@ -112,7 +120,9 @@ class BaseWeaviateDocClient:
             and "Library" in result["data"]["Get"]
         ):
             library_data = result["data"]["Get"]["Library"]
-            print(f"{library_data=}")
+            logging.debug(
+                f"library with ID {lib_id} has documentation files: {library_data=}"
+            )
             """
             1. example, no docs exist: library_data = [{'hasDocumentationFile': None, 'name': 'langchain'}]
             2. example, multiple docs exist: library_data = [{'hasDocumentationFile': [{'title': 'title1'}, {'title': 'title2'}], 'name': 'langchain'}]
@@ -132,6 +142,23 @@ class BaseWeaviateDocClient:
             else:  # case where result={'data': {'Get': {'Library': []}}}
                 logging.error(f"Error getting library with ID {lib_id} from weaviate.")
         return num_docs
+
+    # TODO create test for this class
+    def init_schema(self):
+        existing_schema = self.client.schema.get()
+        existing_classes = {cls["class"] for cls in existing_schema.get("classes", [])}
+
+        required_classes = {library_class["class"], documentation_file_class["class"]}
+
+        # Check if all required classes already exist
+        if not required_classes.issubset(existing_classes):
+            # Create schema with both classes
+            self.client.schema.create(
+                {"classes": [library_class, documentation_file_class]}
+            )
+            logging.info(
+                f"Created schema with classes {library_class['class']} and {documentation_file_class['class']}"
+            )
 
 
 # refactor the following document to put all functions under one class
@@ -220,11 +247,12 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
             "links": self.library.links,
             "description": self.library.lib_desc,
         }
-        print(lib_obj)
         lib_id = self.client.data_object.create(
             data_object=lib_obj, class_name="Library"
         )
-        print(f"{lib_id=}")
+        logging.info(
+            f"Saved library object {lib_id=} to weaviate,library has LIB_ID {lib_id=}"
+        )
         return lib_id
 
     def get_or_create_library(self):
@@ -348,7 +376,7 @@ if __name__ == "__main__":
     client = get_weaviate_client()
     library = Library(libname=libname, links=links)
     weaviate_doc_loader = WeaviateDocLoader(library=library, client=client)
-    # weaviate_doc_loader.run()
+    weaviate_doc_loader.run()
     """
     weaviate_doc_querier = WeaviateDocQuerier(
         library=library, client=weaviate_doc_loader.client
@@ -356,7 +384,8 @@ if __name__ == "__main__":
     docs = weaviate_doc_querier.get_relevant_documents(
         query="Using the langchain library, write code that illustrates usage of the library."
     )
-    print(docs)"""
+    print(docs)
     print(weaviate_doc_loader.get_lib_id())
     num_docs = weaviate_doc_loader.check_library_has_docs(lib_id="some_id")
     print(num_docs)
+    """
