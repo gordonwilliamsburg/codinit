@@ -7,6 +7,7 @@ from langchain.callbacks.manager import (
     CallbackManagerForToolRun,
 )
 from langchain.tools.base import BaseTool
+from pydantic import ConfigDict
 
 
 class WeaviateGraphQLTool(BaseTool):
@@ -47,11 +48,7 @@ class WeaviateGraphQLTool(BaseTool):
     It is always a good idea to set the limit to at least 3!! Also, your first choice is to look at imports!
 
     """  # noqa: E501
-
-    class Config:
-        """Configuration for this pydantic object."""
-
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def _run(
         self,

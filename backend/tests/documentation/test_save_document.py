@@ -12,7 +12,7 @@ def test_save_scraped_data_as_json(mocker, sample_data):
 
     # Construct the expected JSON string
     expected_json_str = json.dumps(
-        [item.dict() for item in sample_data],
+        [item.model_dump() for item in sample_data],
         ensure_ascii=False,
         indent=4
     )

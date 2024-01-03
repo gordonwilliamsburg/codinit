@@ -1,5 +1,6 @@
 
-from codinit.documentation.apify_webscraper import WebScraper  # Adjust the import path as needed
+from codinit.documentation.apify_webscraper import WebScraper
+from pydantic_core import Url  # Adjust the import path as needed
 
 # a mock dataset used to simulate the data returned by the Apify client.
 mock_return_data = [
@@ -29,7 +30,7 @@ mock_return_data = [
 #  a utility function used to generate the expected run_input for a given URL.
 def get_expected_run_input(url):
     return {
-        'startUrls': [{'url': url}],
+        'startUrls': [{'url': Url(url)}],
         # Include other default fields from the RunInput model
         'crawlerType': 'cheerio',
         'includeUrlGlobs': [],
@@ -74,6 +75,7 @@ def test_run_scraping_basic(mock_apify_client):
     actor_id = "test_actor_id"
     scraper = WebScraper(mock_apify_client, actor_id)
 
+    # Run the scraper with a single URL
     test_urls = ["https://example.com"]
     results = scraper.run_scraping(test_urls)
 
@@ -85,12 +87,12 @@ def test_run_scraping_basic(mock_apify_client):
     first_result = results[0]
 
     # Assertions for the first result
-    assert first_result.url == "https://docs.apify.com/academy/web-scraping-for-beginners"
-    assert first_result.crawl.loadedUrl == "https://docs.apify.com/academy/web-scraping-for-beginners"
+    assert first_result.url == Url("https://docs.apify.com/academy/web-scraping-for-beginners")
+    assert first_result.crawl.loadedUrl == Url("https://docs.apify.com/academy/web-scraping-for-beginners")
     assert first_result.crawl.loadedTime == "2023-04-05T16:26:51.030Z"
-    assert first_result.crawl.referrerUrl == "https://docs.apify.com/academy"
+    assert first_result.crawl.referrerUrl == Url("https://docs.apify.com/academy")
     assert first_result.crawl.depth == 0
-    assert first_result.metadata.canonicalUrl == "https://docs.apify.com/academy/web-scraping-for-beginners"
+    assert first_result.metadata.canonicalUrl == Url("https://docs.apify.com/academy/web-scraping-for-beginners")
     assert first_result.metadata.title == "Web scraping for beginners | Apify Documentation"
     assert first_result.metadata.description == "Learn how to develop web scrapers with this comprehensive and practical course. Go from beginner to expert, all in one place."
     assert first_result.metadata.languageCode == "en"
