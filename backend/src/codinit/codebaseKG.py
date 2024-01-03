@@ -7,7 +7,7 @@ import weaviate
 from openai import RateLimitError
 from weaviate.batch import Batch
 
-from codinit.config import client
+from codinit.weaviate_client import get_weaviate_client
 
 
 def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
@@ -413,6 +413,8 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
 
 
 if __name__ == "__main__":
+    client = get_weaviate_client()
+
     analyze_directory(
         "/Users/zarroukinesrine/Desktop/Projects/LangChainRepos/langchain/libs/langchain/langchain",
         "https://github.com/langchain-ai/langchain.git",

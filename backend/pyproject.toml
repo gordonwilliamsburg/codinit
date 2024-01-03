@@ -24,7 +24,7 @@ selenium = "^4.10.0"
 sqlalchemy = "^2.0.17"
 tiktoken = "^0.4.0"
 sentence-transformers = "^2.2.2"
-weaviate-client = "^3.21.0"
+weaviate-client = "^3.26.0"
 types-requests = "^2.31.0.1"
 lxml = "^4.9.2"
 fastapi = "^0.97.0"
@@ -53,6 +53,7 @@ types-pyyaml = "^6.0.12.8"
 pylint = "^3.0.1"
 flake8-pyproject = "^1.2.3"
 ipython = "^8.13.1"
+ipykernel = "^6.28.0"
 
 [tool.poetry.group.docs.dependencies]
 mkdocs = "^1.4.2"
@@ -66,6 +67,8 @@ mkdocs-dracula-theme = "^1.0.4"
 [tool.poetry.group.test.dependencies]
 pytest = "^7.2.2"
 pytest-cov = "^4.0.0"
+pytest-mock = "^3.12.0"
+docker = "^7.0.0"
 
 
 [tool.poetry.group.viz.dependencies]
@@ -90,7 +93,22 @@ ensure_newline_before_comments = true
 line_length = 88
 
 [tool.mypy]
+mypy_path=["./src", "./tests"]
+plugins = [
+  "pydantic.mypy"
+]
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_reexport = true
 ignore_missing_imports = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [tool.flake8]
 exclude = ".venv"

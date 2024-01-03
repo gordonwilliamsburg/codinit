@@ -1,13 +1,12 @@
 import json
-from typing import Optional, Type
+from typing import Optional
 
+import weaviate
 from langchain.callbacks.manager import (
     AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
 )
 from langchain.tools.base import BaseTool
-
-from codinit.config import client
 
 
 class WeaviateGraphQLTool(BaseTool):
@@ -57,6 +56,7 @@ class WeaviateGraphQLTool(BaseTool):
     def _run(
         self,
         query: str,
+        client: weaviate.Client,
         run_manager: Optional[CallbackManagerForToolRun] = None,
     ) -> str:
         # language model sometimes returns the query inside of backticks

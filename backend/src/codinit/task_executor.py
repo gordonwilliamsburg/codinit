@@ -6,7 +6,7 @@ from typing import List, Optional, Tuple, Union
 
 import openai
 import requests
-from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
+import weaviate
 from pydantic import BaseModel
 
 from codinit.agents import (
@@ -17,10 +17,12 @@ from codinit.agents import (
     planner_agent,
 )
 from codinit.code_editor import PythonCodeEditor
-from codinit.config import client, eval_settings
+from codinit.config import eval_settings
 
 # from codinit.get_context import get_embedding_store, get_read_the_docs_context
-from codinit.get_context_ import get_relevant_documents
+from codinit.documentation.get_context import WeaviateDocQuerier
+from codinit.documentation.pydantic_models import Library
+from codinit.weaviate_client import get_weaviate_client
 
 logger = logging.getLogger(__name__)
 ANSWER_PATTERN = r"[a-zA-Z]+"
@@ -162,17 +164,10 @@ class TaskExecutor:
         return relevant_docs
     """
 
-    def get_docs(self, task: str):
-        # first get context from provided libraries
-        retriever = WeaviateHybridSearchRetriever(
-            client=client,
-            index_name="DocumentionFile",
-            text_key="content",
-            k=10,
-            alpha=0.75,
-        )
-        relevant_docs = get_relevant_documents(query=task, retriever=retriever)
-        return relevant_docs
+    def get_docs(self, library: Library, task: str, client: weaviate.Client):
+        weaviate_doc_querier = WeaviateDocQuerier(library=library, client=client)
+        docs = weaviate_doc_querier.get_relevant_documents(query=task)
+        return docs
 
     def format_lint_code(
         self, code: str, dependencies: List[str]
@@ -259,26 +254,20 @@ class TaskExecutor:
             error=error,
             time_stamp=time_stamp,
         )
-        return error
+        return error, new_code
 
     # TODO: add plan to benchmark
     def execute_and_log(
         self,
-        libraries: Optional[List[str]] = None,
+        library: Library,
         source_code: Optional[str] = None,
     ):
+        client = get_weaviate_client()
         attempt = 0
         chat_history = []
         # Generating a coding plan
-        retriever = WeaviateHybridSearchRetriever(
-            client=client,
-            index_name="DocumentionFile",
-            text_key="content",
-            k=5,
-            alpha=0.75,
-        )
         time_stamp = datetime.datetime.now().isoformat()
-        relevant_docs = get_relevant_documents(query=self.task, retriever=retriever)
+        relevant_docs = self.get_docs(library=library, task=self.task, client=client)
         # generate coding plan given context
         plan = self.planner.execute(
             tool_choice="execute_plan",
@@ -303,8 +292,7 @@ class TaskExecutor:
             plan=plan,
             context=relevant_docs,
         )[0]
-        # TODO need to remove redundant code formatting step
-        error = self.code_correction_with_linting(
+        error, new_code = self.code_correction_with_linting(
             new_code=new_code,
             deps=deps,
             relevant_docs=relevant_docs,
@@ -317,7 +305,7 @@ class TaskExecutor:
                 break
             time_stamp = datetime.datetime.now().isoformat()
             # corrected code
-            error = self.code_correction_with_linting(
+            error, new_code = self.code_correction_with_linting(
                 new_code=new_code,
                 deps=deps,
                 relevant_docs=relevant_docs,

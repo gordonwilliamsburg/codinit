@@ -1,4 +1,4 @@
-from codinit.config import client
+from codinit.weaviate_client import get_weaviate_client
 
 # define knowledge graph schema
 schema = {
@@ -460,11 +460,14 @@ import_class_schema = {
         },
     ],
 }
-# create schema
-client.schema.delete_class("Repository")
-client.schema.delete_class("File")
-client.schema.delete_class("Class")
-client.schema.delete_class("Function")
-client.schema.delete_class("Import")
-client.schema.create(schema=schema)
-# client.schema.create_class(import_class_schema)
+if __name__ == "__main__":
+    client = get_weaviate_client()
+
+    # create schema
+    client.schema.delete_class("Repository")
+    client.schema.delete_class("File")
+    client.schema.delete_class("Class")
+    client.schema.delete_class("Function")
+    client.schema.delete_class("Import")
+    client.schema.create(schema=schema)
+    # client.schema.create_class(import_class_schema)

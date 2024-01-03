@@ -1,16 +1,18 @@
 import asyncio
+import csv
+import datetime
 from typing import List
 
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
 from pydantic import BaseModel
 
 from codinit.code_editor import PythonCodeEditor
-from codinit.config import client
-from codinit.get_context_ import get_relevant_documents
-from codinit.queries import get_functions
+from codinit.config import eval_settings
+from codinit.documentation.pydantic_models import Library
+from codinit.main import get_git_info
 from codinit.task_executor import TaskExecutionConfig, TaskExecutor
+from codinit.weaviate_client import get_weaviate_client
 
 app = FastAPI()
 origins = [
@@ -49,89 +51,109 @@ async def generate(websocket: WebSocket):
         print(item.libraries)
         print(item.prompt)
         print(item.source_code)
+        libname = "langchain"
+        links = [
+            "https://langchain-langchain.vercel.app/docs/get_started/",
+        ]
+        library = Library(libname=libname, links=links)
+        sha, message = get_git_info()
+        with open(eval_settings.eval_dataset_location, "a+", newline="") as csvfile:
+            fieldnames = [fieldname for fieldname in eval_settings.eval_columns]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-        code_editor = PythonCodeEditor()
-        config = TaskExecutionConfig()
-        # libraries = item.libraries
-        task = item.prompt
-        # source_code=item.source_code
-        task_executor = TaskExecutor(code_editor, config)
-        retriever = WeaviateHybridSearchRetriever(
-            client=client,
-            index_name="DocumentionFile",
-            text_key="content",
-            k=5,
-            alpha=0.75,
-        )
-        relevant_docs = get_relevant_documents(query=task, retriever=retriever)
-        plan = task_executor.planner.execute(
-            tool_choice="execute_plan",
-            chat_history=[],
-            task=task,
-            context=relevant_docs,
-        )[0]
-        await websocket.send_json({"plan": "\n".join(plan), "code": ""})
-        # install dependencies from plan
-        if (
-            task_executor.config.execute_code
-            and task_executor.config.install_dependencies
-        ):
-            deps = task_executor.dependency_tracker.execute(
-                tool_choice="install_dependencies", chat_history=[], plan=plan
-            )[0]
-            await websocket.send_json(
-                {"plan": "", "code": "", "error": f"dependencies to install: {deps}"}
+            code_editor = PythonCodeEditor()
+            config = TaskExecutionConfig()
+            # libraries = item.libraries
+            task = item.prompt
+            # source_code=item.source_code
+            task_executor = TaskExecutor(
+                code_editor=code_editor,
+                config=config,
+                task=task,
+                run_id=0,
+                task_id=0,
+                sha=sha,
+                message=message,
+                csv_writer=writer,
             )
-            task_executor.install_dependencies(deps)
-        chat_history = []
-        chat_history.append(
-            {"role": "assistant", "content": f"installed dependencies {deps}"}
-        )
-        # generate code
-        new_code = task_executor.coder.execute(
-            task=task,
-            tool_choice="execute_code",
-            chat_history=chat_history,
-            plan=plan,
-            context=relevant_docs,
-        )[0]
-        new_code, _, _ = task_executor.format_lint_code(
-            code=new_code, dependencies=deps
-        )
-        error = task_executor.run_code(new_code)
-        await websocket.send_json(
-            {"plan": "\n".join(plan), "code": new_code, "error": error}
-        )
-        await asyncio.sleep(1)  # Add a sleep delay of 1 second
-        # await websocket.send_text(new_code)
-        # run generated code
-        attempt = 0
-        while "Failed" in error:
-            if attempt > task_executor.config.coding_attempts:
-                break
-            # corrected code
-            new_code = task_executor.code_corrector.execute(
-                tool_choice="execute_code",
+            time_stamp = datetime.datetime.now().isoformat()
+            client = get_weaviate_client()
+            relevant_docs = task_executor.get_docs(
+                library=library, task=task, client=client
+            )
+            plan = task_executor.planner.execute(
+                tool_choice="execute_plan",
                 chat_history=[],
                 task=task,
                 context=relevant_docs,
-                source_code=new_code,
-                error=error,
             )[0]
-            new_code, _, _ = task_executor.format_lint_code(
-                code=new_code, dependencies=deps
+            await websocket.send_json({"plan": "\n".join(plan), "code": ""})
+            # install dependencies from plan
+            if (
+                task_executor.config.execute_code
+                and task_executor.config.install_dependencies
+            ):
+                deps = task_executor.dependency_tracker.execute(
+                    tool_choice="install_dependencies", chat_history=[], plan=plan
+                )[0]
+                await websocket.send_json(
+                    {
+                        "plan": "",
+                        "code": "",
+                        "error": f"dependencies to install: {deps}",
+                    }
+                )
+                task_executor.install_dependencies(deps)
+            chat_history = []
+            chat_history.append(
+                {"role": "assistant", "content": f"installed dependencies {deps}"}
+            )
+            # generate code
+            new_code = task_executor.coder.execute(
+                task=task,
+                tool_choice="execute_code",
+                chat_history=chat_history,
+                plan=plan,
+                context=relevant_docs,
+            )[0]
+            attempt = 0
+            error, new_code = task_executor.code_correction_with_linting(
+                new_code=new_code,
+                deps=deps,
+                relevant_docs=relevant_docs,
+                attempt=attempt,
+                time_stamp=time_stamp,
             )
             await websocket.send_json(
                 {"plan": "\n".join(plan), "code": new_code, "error": error}
             )
+            await asyncio.sleep(1)  # Add a sleep delay of 1 second
             # await websocket.send_text(new_code)
-            error = task_executor.run_code(new_code)
-            attempt += 1
-        await websocket.send_json(
-            {
-                "plan": "\n".join(plan),
-                "code": new_code,
-                "error": error,
-                "is_final": True,
-            }
-        )
+            attempt = 1
+            while "Failed" in error:
+                if attempt > task_executor.config.coding_attempts:
+                    break
+                # corrected code
+
+                await websocket.send_json(
+                    {"plan": "\n".join(plan), "code": new_code, "error": error}
+                )
+                time_stamp = datetime.datetime.now().isoformat()
+                # corrected code
+                error, new_code = task_executor.code_correction_with_linting(
+                    new_code=new_code,
+                    deps=deps,
+                    relevant_docs=relevant_docs,
+                    attempt=attempt,
+                    time_stamp=time_stamp,
+                )
+                # await websocket.send_text(new_code)
+                attempt += 1
+            await websocket.send_json(
+                {
+                    "plan": "\n".join(plan),
+                    "code": new_code,
+                    "error": error,
+                    "is_final": True,
+                }
+            )
