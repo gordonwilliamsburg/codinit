@@ -7,7 +7,6 @@ from typing import List, Optional, Tuple, Union
 import openai
 import requests
 import weaviate
-from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
 from pydantic import BaseModel
 
 from codinit.agents import (

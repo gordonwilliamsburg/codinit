@@ -5,7 +5,6 @@ from typing import List
 
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
 from pydantic import BaseModel
 
 from codinit.code_editor import PythonCodeEditor
