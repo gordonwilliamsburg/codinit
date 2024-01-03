@@ -5,7 +5,7 @@ import weaviate
 import pytest
 from unittest.mock import Mock, mock_open, call
 from unittest.mock import patch
-
+from codinit.documentation.doc_schema import library_class, documentation_file_class
 # Create a fixture to mock the weaviate.Client object
 @pytest.fixture
 def mock_client():
@@ -148,6 +148,7 @@ def test_save_doc_to_weaviate(mock_library, mock_client, mock_documentation_sett
     mock_client.data_object.reference.add.assert_has_calls(calls, any_order=True)
 
 def test_weaviate_doc_loader_integration(test_embedded_weaviate_client, mock_library, mock_documentation_settings, mock_secrets, sample_data):
+    test_embedded_weaviate_client.schema.create({"classes": [library_class, documentation_file_class]})
     # Initialize WeaviateDocLoader
     doc_loader = WeaviateDocLoader(
         library=mock_library,
