@@ -11,16 +11,7 @@ import os
 @pytest.fixture(scope="session")
 def mock_secrets():
     # Create a Secrets instance with test values
-    return Secrets(
-        openai_api_key="test_key",
-        huggingface_key="test_key",
-        persist_dir="test_dir",
-        model_path="test_model_path",
-        repo_path="test_repo_path",
-        docs_dir="test_docs_dir",
-        weaviate_url="http://test_weaviate_url:8080",
-        apify_key="test_apify_key"
-    )
+    return Secrets(_env_file='test.env', _env_file_encoding='utf-8')
 
 @pytest.fixture
 def mock_documentation_settings():

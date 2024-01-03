@@ -28,21 +28,14 @@ def from_yaml(cls: Type[T], yaml_file: str) -> T:  # type: ignore
 class Secrets(BaseSettings):  # type: ignore
     """settings class representing OpenAI API configuration."""
 
-    openai_api_key: str = Field(
-        "" if os.getenv("TESTING") else ..., env="OPENAI_API_KEY"
-    )
-    huggingface_key: str = Field(
-        "" if os.getenv("TESTING") else ..., env="HUGGINGFACE_KEY"
-    )
-    persist_dir: str = Field("" if os.getenv("TESTING") else ..., env="PERSIST_DIR")
-    model_path: str = Field("" if os.getenv("TESTING") else ..., env="MODEL_PATH")
-    repo_path: str = Field("" if os.getenv("TESTING") else ..., env="REPO_DIR")
-    docs_dir: str = Field("" if os.getenv("TESTING") else ..., env="DOCS_DIR")
-    weaviate_url: str = Field("" if os.getenv("TESTING") else ..., env="WEAVIATE_URL")
-    apify_key: str = Field("" if os.getenv("TESTING") else ..., env="APIFY_KEY")
+    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
+    huggingface_key: str = Field(..., env="HUGGINGFACE_KEY")
+    persist_dir: str = Field(..., env="PERSIST_DIR")
+    docs_dir: str = Field(..., env="DOCS_DIR")
+    apify_key: str = Field(..., env="APIFY_KEY")
 
     class Config:
-        env_file = ".env"
+        env_file = "prod.env"
         env_file_encoding = "utf-8"
 
 

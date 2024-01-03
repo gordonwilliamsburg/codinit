@@ -11,7 +11,7 @@ dist/
 *.csv
 *.tsv
 *.xlsx
-.env
+*.env
 *.ipynb_checkpoints
 builds/*
 cache/*
