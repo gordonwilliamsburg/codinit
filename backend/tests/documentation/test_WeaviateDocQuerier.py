@@ -165,10 +165,16 @@ def test_weaviate_doc_loader_integration(test_embedded_weaviate_client, mock_lib
 
     # Perform assertions or verifications
     # Example: Retrieve and verify the saved document from Weaviate
-    query_result = test_embedded_weaviate_client.query.get('Library', properties=['name', 'hasDocumentationFile']).do()
-    assert any(lib['name'] == "langchain" for lib in query_result['data']['Get']['Library'])
+    query_result = test_embedded_weaviate_client.query.get('Library', properties=['name', "hasDocumentationFile {... on DocumentationFile {title}}"]).do()
 
-    #query_result = test_embedded_weaviate_client.query.get('DocumentationFile', properties=['fromLibrary']).do()
-    #assert any(doc['fromLibrary'] == lib_id for doc in query_result['data']['Get']['DocumentationFile'])
+    # query_result : {'data': {'Get': {'Library': [{'hasDocumentationFile': [{'title': 'Example Title'}], 'name': 'langchain'}]}}}
+    assert query_result['data']['Get']['Library']
+    assert query_result['data']['Get']['Library'][0]['name'] == mock_library.libname
+    assert query_result['data']['Get']['Library'][0]['hasDocumentationFile'][0]['title'] == sample_data[0].metadata.title
+
+    query_result = test_embedded_weaviate_client.query.get('DocumentationFile', properties=['fromLibrary {... on Library {name}}']).do()
+    # query_result: {'data': {'Get': {'DocumentationFile': [{'fromLibrary': [{'name': 'langchain'}]}]}}}
+    assert query_result['data']['Get']['DocumentationFile']
+    assert query_result['data']['Get']['DocumentationFile'][0]['fromLibrary'][0]['name'] == mock_library.libname
 
 # TODO test that the given doc adheres to the weaviate schema
