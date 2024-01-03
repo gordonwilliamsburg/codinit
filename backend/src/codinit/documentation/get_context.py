@@ -295,7 +295,7 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
                     "title": doc.metadata.title,
                     "description": doc.metadata.description,
                     "chunknumber": chunk_num,
-                    "source": doc.url,
+                    "source": str(doc.url),
                     "language": doc.metadata.languageCode,
                     "content": chunk,
                 }

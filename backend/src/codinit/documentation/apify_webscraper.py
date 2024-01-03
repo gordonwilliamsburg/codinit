@@ -2,7 +2,7 @@ import datetime
 from typing import List
 
 from apify_client import ApifyClient
-from pydantic import HttpUrl, ValidationError, parse_obj_as
+from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from codinit.documentation.pydantic_models import RunInput, StartUrl, WebScrapingData
 
@@ -28,7 +28,7 @@ class WebScraper:
         )
         start = datetime.datetime.now()
         # call website content crawler from apify, which has id aYG0l9s7dbB7j3gbS
-        run = self.client.actor(self.actor_id).call(run_input=run_input.dict())
+        run = self.client.actor(self.actor_id).call(run_input=run_input.model_dump())
 
         # Initialize an empty list to store Pydantic models
         scraped_data_models: List[WebScrapingData] = []
@@ -37,7 +37,8 @@ class WebScraper:
         for item in self.client.dataset(run["defaultDatasetId"]).iterate_items():
             # handle potential validation errors when parsing items
             try:
-                model = parse_obj_as(WebScrapingData, item)
+                adapter = TypeAdapter(WebScrapingData)
+                model = adapter.validate_python(item)
                 scraped_data_models.append(model)
             except ValidationError as e:
                 print("Error parsing item to model:", e)
@@ -50,8 +51,9 @@ class WebScraper:
         # parse urls to HttpUrls
         # TODO in pydantic v2 use TypeAdapter
         # https://stackoverflow.com/questions/72567679/why-i-cannot-create-standalone-object-of-httpurl-in-pydantic
-        urls = [parse_obj_as(HttpUrl, url) for url in urls]
-        return self.run_scraping(urls=urls)  # type: ignore
+        ta = TypeAdapter(HttpUrl)
+        parsed_urls: List[HttpUrl] = [ta.validate_python(url) for url in urls]
+        return self.run_scraping(urls=parsed_urls)  # type: ignore
 
 
 if __name__ == "__main__":

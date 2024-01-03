@@ -8,27 +8,56 @@ from typing_extensions import Annotated
 class Crawl(BaseModel):
     loadedUrl: HttpUrl
     loadedTime: str  # Ideally, this should be a datetime type
-    referrerUrl: Optional[HttpUrl]
+    referrerUrl: Optional[HttpUrl] = None
     depth: int
+
+    def model_dump(self):
+        return {
+            "loadedUrl": str(self.loadedUrl),
+            "loadedTime": self.loadedTime,
+            "referrerUrl": str(self.referrerUrl) if self.referrerUrl else None,
+            "depth": self.depth,
+        }
 
 
 class Metadata(BaseModel):
     canonicalUrl: HttpUrl
     title: str
     description: str
-    author: Optional[str]
-    keywords: Optional[str]
+    author: Optional[str] = None
+    keywords: Optional[str] = None
     languageCode: str
+
+    def model_dump(self):
+        return {
+            "canonicalUrl": str(self.canonicalUrl),
+            "title": self.title,
+            "description": self.description,
+            "author": self.author,
+            "keywords": self.keywords,
+            "languageCode": self.languageCode,
+        }
 
 
 class WebScrapingData(BaseModel):
     url: HttpUrl
     crawl: Crawl
     metadata: Metadata
-    screenshotUrl: Optional[HttpUrl]
+    screenshotUrl: Optional[HttpUrl] = None
     text: str
-    html: Optional[str]
-    markdown: Optional[str]
+    html: Optional[str] = None
+    markdown: Optional[str] = None
+
+    def model_dump(self):
+        return {
+            "url": str(self.url),
+            "crawl": self.crawl.model_dump(),  # Assuming Crawl also has model_dump()
+            "metadata": self.metadata.model_dump(),  # Assuming Metadata also has model_dump()
+            "screenshotUrl": str(self.screenshotUrl) if self.screenshotUrl else None,
+            "text": self.text,
+            "html": self.html,
+            "markdown": self.markdown,
+        }
 
 
 # Crawling input models

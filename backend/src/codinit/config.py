@@ -2,7 +2,8 @@ from typing import List, Type, TypeVar
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load .env file
 load_dotenv()
@@ -27,15 +28,12 @@ def from_yaml(cls: Type[T], yaml_file: str) -> T:  # type: ignore
 class Secrets(BaseSettings):  # type: ignore
     """settings class representing OpenAI API configuration."""
 
-    openai_api_key: str = Field(..., env="OPENAI_API_KEY")
-    huggingface_key: str = Field(..., env="HUGGINGFACE_KEY")
-    persist_dir: str = Field(..., env="PERSIST_DIR")
-    docs_dir: str = Field(..., env="DOCS_DIR")
-    apify_key: str = Field(..., env="APIFY_KEY")
-
-    class Config:
-        env_file = "prod.env"
-        env_file_encoding = "utf-8"
+    openai_api_key: str = Field(..., validation_alias="OPENAI_API_KEY")
+    huggingface_key: str = Field(..., validation_alias="HUGGINGFACE_KEY")
+    persist_dir: str = Field(..., validation_alias="PERSIST_DIR")
+    docs_dir: str = Field(..., validation_alias="DOCS_DIR")
+    apify_key: str = Field(..., validation_alias="APIFY_KEY")
+    model_config = SettingsConfigDict(env_file="prod.env", env_file_encoding="utf-8")
 
 
 class AgentSettings(BaseSettings):  # type: ignore

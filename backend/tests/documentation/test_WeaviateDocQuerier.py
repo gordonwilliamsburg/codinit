@@ -59,7 +59,7 @@ def test_get_raw_documentation_file_exists(mock_library, mock_client, mock_docum
     WeaviateDocLoader.load_json = mock_load_json
 
     # mock the file open and read operations.
-    mock_file_open = mock_open(read_data=json.dumps([data.dict() for data in sample_data]))
+    mock_file_open = mock_open(read_data=json.dumps([data.model_dump() for data in sample_data]))
     with patch('builtins.open', mock_file_open):
         # Initialize WeaviateDocLoader
         doc_loader = WeaviateDocLoader(
