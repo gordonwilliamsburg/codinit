@@ -247,6 +247,21 @@ astroid = ["astroid (>=1,<2)", "astroid (>=2,<4)"]
 test = ["astroid (>=1,<2)", "astroid (>=2,<4)", "pytest"]
 
 [[package]]
+name = "astunparse"
+version = "1.6.3"
+description = "An AST unparser for Python"
+optional = false
+python-versions = "*"
+files = [
+    {file = "astunparse-1.6.3-py2.py3-none-any.whl", hash = "sha256:c2652417f2c8b5bb325c885ae329bdf3f86424075c4fd1a128674bc6fba4b8e8"},
+    {file = "astunparse-1.6.3.tar.gz", hash = "sha256:5ad93a8456f0d084c3456d059fd9a92cce667963232cbf763eac3bc5b7940872"},
+]
+
+[package.dependencies]
+six = ">=1.6.1,<2.0"
+wheel = ">=0.23.0,<1.0"
+
+[[package]]
 name = "attrs"
 version = "23.2.0"
 description = "Classes Without Boilerplate"
@@ -4076,6 +4091,21 @@ files = [
 ]
 
 [[package]]
+name = "pyflowchart"
+version = "0.3.1"
+description = "Python codes to Flowcharts."
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "pyflowchart-0.3.1-py3-none-any.whl", hash = "sha256:77959dc1d9c2d880d6d621c70f22f48f82620cd520435ce2d4d9a9dafb80539e"},
+    {file = "pyflowchart-0.3.1.tar.gz", hash = "sha256:4268699c4d11d1ab4e5276a12441f7eea6468ee3d87fadb54a4d2449cc3526c1"},
+]
+
+[package.dependencies]
+astunparse = "*"
+chardet = "*"
+
+[[package]]
 name = "pygments"
 version = "2.17.2"
 description = "Pygments is a syntax highlighting package written in Python."
@@ -6435,6 +6465,20 @@ files = [
 ]
 
 [[package]]
+name = "wheel"
+version = "0.42.0"
+description = "A built-package format for Python"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "wheel-0.42.0-py3-none-any.whl", hash = "sha256:177f9c9b0d45c47873b619f5b650346d632cdc35fb5e4d25058e09c9e581433d"},
+    {file = "wheel-0.42.0.tar.gz", hash = "sha256:c45be39f7882c9d34243236f2d63cbd58039e360f85d0913425fbd7ceea617a8"},
+]
+
+[package.extras]
+test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
+
+[[package]]
 name = "wsproto"
 version = "1.2.0"
 description = "WebSockets state-machine based protocol implementation"
@@ -6657,4 +6701,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "93dc9bc0c2d41c14cbe6bebae989ba93ef6c865a7a2e6235588ac63d0a737698"
+content-hash = "c010e614cd309bb9d0e4869f85879e3a2f8a7fa2968d0c73459b1b3dc8be28ad"
