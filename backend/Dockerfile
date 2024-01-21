@@ -25,14 +25,14 @@ WORKDIR /app
 # Copy the project files into the container
 COPY pyproject.toml .
 COPY poetry.lock .
-COPY .env .
+COPY prod.env .
 
 RUN poetry config virtualenvs.create false
 RUN poetry install --no-interaction --no-ansi --without dev,test,docs,viz
 
 # uncomment to remove cached files and keep lightweight Docker image
 # comment out to keep cached files, including the Poetry cache, between rebuilds
-# RUN rm -r /root/.cache
+RUN rm -r /root/.cache
 
 COPY ./configs ./configs/
 
