@@ -82,3 +82,37 @@ sequenceDiagram
 
     CodeCorr->>Client: return final code
 ```
+
+### App Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    participant Client as Web Client
+    participant WS as WebSocket
+    participant FastAPI as FastAPI Server
+    participant Executor as TaskExecutor
+    participant Weaviate as get_weaviate_client()
+    participant Docs as get_docs()
+    participant PlanGen as Planner
+    participant Coder as Coder
+    participant CodeCorr as code_correction_with_linting()
+
+    Client->>WS: Connect to WebSocket (/generate/)
+    WS->>FastAPI: Client connects
+    FastAPI->>Executor: Initialize TaskExecutor
+    Executor->>Weaviate: Retrieve client
+    Weaviate->>Docs: Get relevant documents
+    Docs->>PlanGen: Generate execution plan
+    PlanGen->>Executor: Return execution plan
+    Executor->>Coder: Generate initial code
+    Coder->>CodeCorr: Correct and lint initial code
+    alt Error Found
+        CodeCorr->>Executor: Attempt to correct code
+        Executor->>CodeCorr: Reapply corrections
+    else No Error
+    end
+    Executor->>WS: Send final execution plan, code, and error status
+    WS->>Client: Send response (JSON)
+    Client->>WS: Send next request or close
+    WS->>FastAPI: Close WebSocket
+```
