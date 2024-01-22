@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import datetime
+import logging
 from typing import List
 
 from fastapi import FastAPI, WebSocket
@@ -13,6 +14,11 @@ from codinit.documentation.pydantic_models import Library
 from codinit.main import get_git_info
 from codinit.task_executor import TaskExecutionConfig, TaskExecutor
 from codinit.weaviate_client import get_weaviate_client
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 app = FastAPI()
 origins = [
@@ -29,7 +35,8 @@ app.add_middleware(
 
 
 class Item(BaseModel):
-    libraries: List[str]
+    links: List[str]
+    libname: str
     prompt: str
     source_code: str
 
@@ -48,14 +55,8 @@ async def generate(websocket: WebSocket):
     while True:
         data = await websocket.receive_json()
         item = Item(**data)
-        print(item.libraries)
-        print(item.prompt)
-        print(item.source_code)
-        libname = "langchain"
-        links = [
-            "https://langchain-langchain.vercel.app/docs/get_started/",
-        ]
-        library = Library(libname=libname, links=links)
+        logging.info(f"item: {item}")
+        library = Library(libname=item.libname, links=item.links)
         sha, message = get_git_info()
         with open(eval_settings.eval_dataset_location, "a+", newline="") as csvfile:
             fieldnames = [fieldname for fieldname in eval_settings.eval_columns]
