@@ -93,8 +93,7 @@ class TaskExecutor:
             try:
                 deps = ast.literal_eval(deps)
             except (SyntaxError, ValueError):
-                print("The string couldn't be evaluated.")
-        # print(type(deps))
+                logging.error("The string couldn't be evaluated.")
         dependencies = []
         for d in deps:
             d = d.strip()
@@ -220,18 +219,18 @@ class TaskExecutor:
             code=new_code, dependencies=deps
         )
         # feed in lint results
-        print(f"{lint_result=}")
+        logging.info(f"{lint_result=}")
         # TODO: check if linting output is not empty
         if len(lint_result) > 0:
             lint_query_results = self.linter.execute(
                 source_code=new_code, linter_output=lint_result
             )
-            print(lint_query_results)
+            logging.info(f"{lint_query_results=}")
             lint_response = openai.chat.completions.create(
                 model="gpt-3.5-turbo-1106",
                 messages=self.linter.messages,
             )
-            print(f"{lint_response=}")
+            logging.info(f"{lint_response=}")
             new_code = self.code_corrector.execute(
                 tool_choice="execute_code",
                 chat_history=[],
