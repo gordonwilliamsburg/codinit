@@ -11,7 +11,7 @@ from weaviate.batch import Batch
 from codinit.weaviate_client import get_weaviate_client
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 
@@ -54,24 +54,34 @@ def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
 
 def file_already_exists(filename: str, link: str, client: weaviate.Client) -> bool:
     """
-    Checks if file has already been visited before so it can be skipped.
+    Checks if a file has already been visited before so it can be skipped.
     """
-    query = f"""
-    {{
-        Get {{
-            File (where: {{ path: ["name"], operator: Equal, valueString: "{filename}" }}) {{
-                link
-            }}
-        }}
-    }}
-    """
-    queried_links = client.query.raw(query)["data"]["Get"]["File"]
-    file_exists = False
-    if len(queried_links) > 0:
-        for queried_link in queried_links:
-            if queried_link["link"] == link:
+    try:
+        result = (
+            client.query.get(
+                "File",  # 'File' is the weaviate class name
+                properties=["link"],  # retrieve the 'link' property
+            )
+            .with_where(
+                {"path": ["name"], "operator": "Equal", "valueString": filename}
+            )
+            .do()
+        )
+
+        logging.debug(f"Query result: {result}")
+
+        # Process the result to check if a file with the same link exists
+        file_exists = False
+        for item in result["data"]["Get"]["File"]:
+            if item["link"] == link:
                 file_exists = True
-    return file_exists
+                break
+
+        return file_exists
+
+    except Exception as e:
+        logging.error(f"Error in querying Weaviate: {e}")
+        return False
 
 
 def get_full_name(node):
