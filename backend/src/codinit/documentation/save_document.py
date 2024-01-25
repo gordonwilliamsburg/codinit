@@ -1,9 +1,18 @@
 import json
+import logging
+import os
 from typing import List
 
+from apify_client import ApifyClient
 from pydantic import TypeAdapter
 
+from codinit.config import Secrets, secrets
+from codinit.documentation.apify_webscraper import WebScraper
 from codinit.documentation.pydantic_models import WebScrapingData
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 def save_scraped_data_as_json(data: List[WebScrapingData], filename: str):
@@ -30,23 +39,41 @@ def load_scraped_data_from_json(filename: str) -> List[WebScrapingData]:
         return [typeadapter.validate_python(item) for item in data]
 
 
+class ScraperSaver:
+    def __init__(
+        self, libname: str, apify_client: ApifyClient, secrets: Secrets = secrets
+    ):
+        self.scraper = WebScraper(apify_client)
+        self.secrets = secrets
+        self.libname = libname
+        self.filename = self.secrets.docs_dir + "/" + libname + ".json"
+
+    def check_lib_docs_saved(self):
+        if os.path.exists(self.filename):
+            return True
+        else:
+            return False
+
+    def scrape_and_save_apify_docs(self, urls: List[str]):
+        if not self.check_lib_docs_saved():
+            logging.info(
+                "No library docs found for "
+                + self.libname
+                + " under "
+                + self.filename
+                + " , scraping..."
+            )
+            scraped_data_models = self.scraper.scrape_urls(urls=urls)
+            save_scraped_data_as_json(data=scraped_data_models, filename=self.filename)
+            logging.info(
+                "Library docs saved " + self.libname + " under " + self.filename
+            )
+        else:
+            logging.info("Library docs already exist " + self.libname)
+
+
 if __name__ == "__main__":
-    from apify_client import ApifyClient
-
-    from codinit.config import secrets
-    from codinit.documentation.apify_webscraper import WebScraper
-
     client = ApifyClient(secrets.apify_key)
-    scraper = WebScraper(client)
-    scraped_data_models = scraper.scrape_urls(
-        urls=["https://docs.apify.com/academy/web-scraping-for-beginners"]
-    )
-    for model in scraped_data_models:
-        print(model.text)
-    filename = "/apify_test.json"
-    save_scraped_data_as_json(
-        data=scraped_data_models, filename=secrets.docs_dir + filename
-    )
-    data = load_scraped_data_from_json(filename=secrets.docs_dir + filename)
-    for model in data:
-        print(model.text)
+    scraper_saver = ScraperSaver(libname="test", apify_client=client)
+    urls = ["https://docs.apify.com/academy/web-scraping-for-beginners"]
+    scraper_saver.scrape_and_save_apify_docs(urls=urls)

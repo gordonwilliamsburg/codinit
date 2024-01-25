@@ -26,6 +26,10 @@ TASKS = [
 libname = "langchain"
 links = [
     "https://langchain-langchain.vercel.app/docs/get_started/",
+    "https://python.langchain.com/docs/modules/",
+    "https://python.langchain.com/docs/use_cases",
+    "https://python.langchain.com/docs/guides",
+    "https://python.langchain.com/docs/integrations",
 ]
 library = Library(libname=libname, links=links)
 
