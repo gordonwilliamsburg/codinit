@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 
@@ -9,12 +10,16 @@ from weaviate.batch import Batch
 
 from codinit.weaviate_client import get_weaviate_client
 
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
     """
     Simple function to call OpenAI API without function calls.
     Args:
-        user_prompt: will contain a request for explaantion containing variables handed in at call time where we ask GPT to formulate
+        user_prompt: will contain a request for explanation containing variables handed in at call time where we ask GPT to formulate
             an answer about the given varables.
         modelname: GPT model to use for API call
 
@@ -31,15 +36,19 @@ def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
         # Convert the response to an OpenAIResponse object and return
         return response.choices[0].message.content
     except RateLimitError as e:
-        print("Rate limit reached, waiting to retry...")
-        print(f"Exception: {e}")
+        logging.error(
+            "Rate limit reached for ChatCompletion API while code base analysis, waiting to retry..."
+        )
+        logging.error(f"Exception: {e}")
         # TODO adjust this constant time to extract the wait time is reported in the exception
         wait_time = 10
         time.sleep(wait_time)
         raise
     except Exception as e:
-        print("Unable to generate ChatCompletion response")
-        print(f"Exception: {e}")
+        logging.error(
+            "Unable to generate ChatCompletion response while code base analysis"
+        )
+        logging.error(f"Exception: {e}")
         raise  # Re-raise the exception to trigger the retry mechanism
 
 
@@ -258,7 +267,7 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
         elif isinstance(node, libcst.ClassDef):
             # Class entity
             class_name = node.name.value
-            print(f"visited class node {class_name}")
+            logging.info(f"visited class node {class_name}")
             class_attributes = extract_attributes(node)
             # class_code = libcst.Module([node]).code
             class_description = ""
@@ -274,14 +283,14 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                 # class_description = call_GPT(user_prompt=class_prompt)
             except Exception as e:
                 class_description = ""
-                print(e)
+                logging.error(e)
 
             class_obj = {
                 "name": class_name,
                 "attributes": class_attributes,
                 "description": class_description,
             }
-            print(f"{class_obj=}")
+            logging.info(f"Created class object {class_obj=}")
 
             # Create class in Weaviate and get its ID
             class_id = batch.add_data_object(data_object=class_obj, class_name="Class")
@@ -359,7 +368,7 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                             to_object_uuid=function_id,
                         )
                     except AttributeError as e:
-                        print(e)
+                        logging.error(e)
 
     return file_id
 
@@ -369,27 +378,29 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
     Analyzes all Python files in a directory (and its subdirectories), collects a
     list of dictionaries containing filename, function names, and class names for each file.
     """
-    print("analyzing directory")
+    logging.info(f"Analyzing Code Directory {directory=}")
     # File entity
     directory_obj = {
         "name": directory,
         "link": repo_url,
     }
-    print(directory_obj)
     # Create file in Weaviate and get its id
     directory_id = weaviate_client.data_object.create(
         data_object=directory_obj, class_name="Repository"
     )
-    print("created dir")
+    logging.info(
+        f"created directory object in weaviate db {directory_obj=} with {directory_id=}"
+    )
     for root, _, files in os.walk(directory):
-        print(files)
+        logging.info(f"Found following files in directory {root=}: {files=}")
         weaviate_client.batch.configure(batch_size=20)
         with weaviate_client.batch as batch:
             for file in files:
                 if file.endswith(".py"):  # Process only Python files
-                    print("---------")
                     file_path = os.path.join(root, file)
-                    print(f"{file_path=}---------")
+                    logging.info(
+                        f"Analyzing file {file_path=}, will skip if analysis exists---------"
+                    )
                     with open(file_path, "r") as f:
                         file_content = f.read()
                     file_exists = file_already_exists(
@@ -399,7 +410,9 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
                         file_id = parse_file(
                             file_content, file, file_path, batch
                         )  # Analyze the file and add its data to the weaviate db
-                        print(f"{file_id=}---------")
+                        logging.info(
+                            f"File analysis complete. Analyzed file {file_id=}---------"
+                        )
                         # Repository -> File relationship
                         batch.add_reference(
                             from_object_class_name="Repository",
