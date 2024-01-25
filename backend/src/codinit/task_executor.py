@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple, Union
 import openai
 import requests
 import weaviate
+from apify_client import ApifyClient
 from pydantic import BaseModel
 
 from codinit.agents import (
@@ -17,11 +18,12 @@ from codinit.agents import (
     planner_agent,
 )
 from codinit.code_editor import PythonCodeEditor
-from codinit.config import eval_settings
+from codinit.config import eval_settings, secrets
 
 # from codinit.get_context import get_embedding_store, get_read_the_docs_context
 from codinit.documentation.get_context import WeaviateDocQuerier
 from codinit.documentation.pydantic_models import Library
+from codinit.documentation.save_document import ScraperSaver
 from codinit.weaviate_client import get_weaviate_client
 
 logger = logging.getLogger(__name__)
@@ -163,6 +165,11 @@ class TaskExecutor:
         return relevant_docs
     """
 
+    def scrape_docs(self, library: Library):
+        client = ApifyClient(secrets.apify_key)
+        scraper_saver = ScraperSaver(libname=library.libname, apify_client=client)
+        scraper_saver.scrape_and_save_apify_docs(urls=library.links)
+
     def get_docs(self, library: Library, task: str, client: weaviate.Client):
         weaviate_doc_querier = WeaviateDocQuerier(library=library, client=client)
         docs = weaviate_doc_querier.get_relevant_documents(query=task)
@@ -266,6 +273,7 @@ class TaskExecutor:
         chat_history = []
         # Generating a coding plan
         time_stamp = datetime.datetime.now().isoformat()
+        self.scrape_docs(library=library)
         relevant_docs = self.get_docs(library=library, task=self.task, client=client)
         # generate coding plan given context
         plan = self.planner.execute(

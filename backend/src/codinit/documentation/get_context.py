@@ -164,7 +164,7 @@ class BaseWeaviateDocClient:
 # refactor the following document to put all functions under one class
 class WeaviateDocLoader(BaseWeaviateDocClient):
     """
-    loads the documentation of a library and save it to weaviate.
+    loads the documentation of a library from json and save it to weaviate.
     """
 
     def __init__(
@@ -314,7 +314,7 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
         lib_id = self.get_or_create_library()
         data = self.get_raw_documentation()
         if len(data) == 0:
-            print("No data found.")
+            logging.error("No data found.")
         else:
             # embed documentation to weaviate
             self.embed_documentation(data=data, lib_id=lib_id)

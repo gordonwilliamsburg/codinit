@@ -79,6 +79,7 @@ async def generate(websocket: WebSocket):
             )
             time_stamp = datetime.datetime.now().isoformat()
             client = get_weaviate_client()
+            task_executor.scrape_docs(library=library)
             relevant_docs = task_executor.get_docs(
                 library=library, task=task, client=client
             )
