@@ -450,6 +450,7 @@ def clone_repo(repo_url: str, local_dir: Union[str, os.PathLike]) -> None:
         logging.info(f"Repository cloned successfully to {local_dir}")
     except Exception as e:
         logging.error(f"An error occurred: {e}")
+        raise
 
 
 # check if repo has been cloned
