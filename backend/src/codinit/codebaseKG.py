@@ -1,10 +1,12 @@
 import logging
 import os
 import time
+from typing import Union
 
 import libcst
 import openai
 import weaviate
+from git import Repo
 from openai import RateLimitError
 
 from codinit.weaviate_client import get_weaviate_client
@@ -436,11 +438,37 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
     return directory_id
 
 
-if __name__ == "__main__":
-    client = get_weaviate_client()
+def clone_repo(repo_url: str, local_dir: Union[str, os.PathLike]) -> None:
+    """
+    Clones a Git repository to a specified local directory.
 
+    :param repo_url: URL of the Git repository to clone.
+    :param local_dir: Local directory path where the repository should be cloned.
+    """
+    try:
+        Repo.clone_from(repo_url, local_dir)
+        logging.info(f"Repository cloned successfully to {local_dir}")
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        raise
+
+
+# check if repo has been cloned
+# if not, clone it
+# check if repo has been analyzed
+# if not, analyze it
+if __name__ == "__main__":
+    from codinit.config import secrets
+
+    libname = "langchain"
+    repo_dir = secrets.repo_dir + "/" + libname
+    repo_url = "https://github.com/langchain-ai/langchain.git"
+    clone_repo(repo_url, repo_dir)
+    client = get_weaviate_client()
+    """
     analyze_directory(
-        "/Users/zarroukinesrine/Desktop/Projects/LangChainRepos/langchain/libs/langchain/langchain",
-        "https://github.com/langchain-ai/langchain.git",
-        client,
+        directory= repo_dir + "/libs/langchain/langchain",
+        repo_url=repo_url,
+        client=client,
     )
+    """

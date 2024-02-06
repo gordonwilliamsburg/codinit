@@ -33,6 +33,7 @@ class Secrets(BaseSettings):  # type: ignore
     persist_dir: str = Field(..., validation_alias="PERSIST_DIR")
     docs_dir: str = Field(..., validation_alias="DOCS_DIR")
     apify_key: str = Field(..., validation_alias="APIFY_KEY")
+    repo_dir: str = Field(..., validation_alias="REPO_DIR")
     model_config = SettingsConfigDict(env_file="prod.env", env_file_encoding="utf-8")
 
 
