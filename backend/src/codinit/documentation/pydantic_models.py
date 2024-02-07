@@ -111,3 +111,5 @@ class Library(BaseModel):
     links: List[str]
     exclude_dirs: Optional[List[str]] = None
     lib_desc: Optional[str] = None
+    lib_version: Optional[str] = None
+    lib_repo_url: str
