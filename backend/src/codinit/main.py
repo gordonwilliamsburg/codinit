@@ -31,7 +31,8 @@ links = [
     "https://python.langchain.com/docs/guides",
     "https://python.langchain.com/docs/integrations",
 ]
-library = Library(libname=libname, links=links)
+library_repo_url = "https://github.com/langchain-ai/langchain.git"
+library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
 
 
 def get_git_info() -> Tuple[str, str]:
