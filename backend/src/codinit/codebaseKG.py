@@ -1,20 +1,26 @@
+import logging
 import os
 import time
+from typing import Union
 
 import libcst
 import openai
 import weaviate
+from git import Repo
 from openai import RateLimitError
-from weaviate.batch import Batch
 
 from codinit.weaviate_client import get_weaviate_client
+
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
     """
     Simple function to call OpenAI API without function calls.
     Args:
-        user_prompt: will contain a request for explaantion containing variables handed in at call time where we ask GPT to formulate
+        user_prompt: will contain a request for explanation containing variables handed in at call time where we ask GPT to formulate
             an answer about the given varables.
         modelname: GPT model to use for API call
 
@@ -31,38 +37,52 @@ def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
         # Convert the response to an OpenAIResponse object and return
         return response.choices[0].message.content
     except RateLimitError as e:
-        print("Rate limit reached, waiting to retry...")
-        print(f"Exception: {e}")
+        logging.error(
+            "Rate limit reached for ChatCompletion API while code base analysis, waiting to retry..."
+        )
+        logging.error(f"Exception: {e}")
         # TODO adjust this constant time to extract the wait time is reported in the exception
         wait_time = 10
         time.sleep(wait_time)
         raise
     except Exception as e:
-        print("Unable to generate ChatCompletion response")
-        print(f"Exception: {e}")
+        logging.error(
+            "Unable to generate ChatCompletion response while code base analysis"
+        )
+        logging.error(f"Exception: {e}")
         raise  # Re-raise the exception to trigger the retry mechanism
 
 
 def file_already_exists(filename: str, link: str, client: weaviate.Client) -> bool:
     """
-    Checks if file has already been visited before so it can be skipped.
+    Checks if a file has already been visited before so it can be skipped.
     """
-    query = f"""
-    {{
-        Get {{
-            File (where: {{ path: ["name"], operator: Equal, valueString: "{filename}" }}) {{
-                link
-            }}
-        }}
-    }}
-    """
-    queried_links = client.query.raw(query)["data"]["Get"]["File"]
-    file_exists = False
-    if len(queried_links) > 0:
-        for queried_link in queried_links:
-            if queried_link["link"] == link:
+    try:
+        result = (
+            client.query.get(
+                "File",  # 'File' is the weaviate class name
+                properties=["link"],  # retrieve the 'link' property
+            )
+            .with_where(
+                {"path": ["name"], "operator": "Equal", "valueString": filename}
+            )
+            .do()
+        )
+
+        logging.debug(f"Query result: {result}")
+
+        # Process the result to check if a file with the same link exists
+        file_exists = False
+        for item in result["data"]["Get"]["File"]:
+            if item["link"] == link:
                 file_exists = True
-    return file_exists
+                break
+
+        return file_exists
+
+    except Exception as e:
+        logging.error(f"Error in querying Weaviate: {e}")
+        return False
 
 
 def get_full_name(node):
@@ -139,7 +159,9 @@ def extract_attributes(class_node):
 
 
 # TODO handle out of context length for descriptions
-def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
+def parse_file(
+    file_content: str, file_name: str, link: str, weaviate_client: weaviate.Client
+):
     """Parse a single file and store its entities and their relationships in Weaviate."""
 
     # takes the Python source code (stored as a string in file_content) and parses it into an AST, which is stored in module.
@@ -147,7 +169,7 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
     # File entity
     file = {"name": file_name, "link": link}
     # Create file in Weaviate and get its id
-    file_id = batch.add_data_object(data_object=file, class_name="File")
+    file_id = weaviate_client.data_object.create(data_object=file, class_name="File")
 
     # Repository -> File relationship
     for node in module.children:
@@ -170,17 +192,17 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                     }
                     # print(f"{import_obj=}")
                     # Create import in Weaviate and get its ID
-                    import_id = batch.add_data_object(
+                    import_id = weaviate_client.data_object.create(
                         data_object=import_obj, class_name="Import"
                     )
 
                     # File -> Import relationship
-                    batch.add_reference(
-                        from_object_class_name="File",
-                        from_object_uuid=file_id,
+                    weaviate_client.data_object.reference.add(
+                        from_class_name="File",
+                        from_uuid=file_id,
                         from_property_name="hasImport",
-                        to_object_class_name="Import",
-                        to_object_uuid=import_id,
+                        to_class_name="Import",
+                        to_uuid=import_id,
                     )
 
             elif isinstance(node, libcst.Import):
@@ -193,26 +215,26 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                     }
                     # print(f"{import_obj=}")
                     # Create import in Weaviate and get its ID
-                    import_id = batch.add_data_object(
+                    import_id = weaviate_client.data_object.create(
                         data_object=import_obj, class_name="Import"
                     )
 
                     # File -> Import relationship
-                    batch.add_reference(
-                        from_object_class_name="File",
-                        from_object_uuid=file_id,
+                    weaviate_client.data_object.reference.add(
+                        from_class_name="File",
+                        from_uuid=file_id,
                         from_property_name="hasImport",
-                        to_object_class_name="Import",
-                        to_object_uuid=import_id,
+                        to_class_name="Import",
+                        to_uuid=import_id,
                     )
 
                     # Import -> File relationship
-                    batch.add_reference(
-                        from_object_class_name="Import",
-                        from_object_uuid=import_id,
+                    weaviate_client.data_object.reference.add(
+                        from_class_name="Import",
+                        from_uuid=import_id,
                         from_property_name="belongsToFile",
-                        to_object_class_name="File",
-                        to_object_uuid=file_id,
+                        to_class_name="File",
+                        to_uuid=file_id,
                     )
 
         elif isinstance(node, libcst.FunctionDef):
@@ -240,17 +262,17 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
             }
             # print(f"{function_obj=}")
             # Create function in Weaviate and get its ID
-            function_id = batch.add_data_object(
+            function_id = weaviate_client.data_object.create(
                 data_object=function_obj, class_name="Function"
             )
 
             # File -> Function relationship
-            batch.add_reference(
-                from_object_class_name="File",
-                from_object_uuid=file_id,
+            weaviate_client.data_object.reference.add(
+                from_class_name="File",
+                from_uuid=file_id,
                 from_property_name="hasFunction",
-                to_object_class_name="Function",
-                to_object_uuid=function_id,
+                to_class_name="Function",
+                to_uuid=function_id,
             )
 
             # TODO Function -> Code relationship
@@ -258,7 +280,7 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
         elif isinstance(node, libcst.ClassDef):
             # Class entity
             class_name = node.name.value
-            print(f"visited class node {class_name}")
+            logging.info(f"visited class node {class_name}")
             class_attributes = extract_attributes(node)
             # class_code = libcst.Module([node]).code
             class_description = ""
@@ -274,25 +296,27 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                 # class_description = call_GPT(user_prompt=class_prompt)
             except Exception as e:
                 class_description = ""
-                print(e)
+                logging.error(e)
 
             class_obj = {
                 "name": class_name,
                 "attributes": class_attributes,
                 "description": class_description,
             }
-            print(f"{class_obj=}")
+            logging.info(f"Created class object {class_obj=}")
 
             # Create class in Weaviate and get its ID
-            class_id = batch.add_data_object(data_object=class_obj, class_name="Class")
+            class_id = weaviate_client.data_object.create(
+                data_object=class_obj, class_name="Class"
+            )
 
             # File -> Class relationship
-            batch.add_reference(
-                from_object_class_name="File",
-                from_object_uuid=file_id,
+            weaviate_client.data_object.reference.add(
+                from_class_name="File",
+                from_uuid=file_id,
                 from_property_name="hasClass",
-                to_object_class_name="Class",
-                to_object_uuid=class_id,
+                to_class_name="Class",
+                to_uuid=class_id,
             )
 
             for sub_node in node.body.body:
@@ -323,43 +347,43 @@ def parse_file(file_content: str, file_name: str, link: str, batch: Batch):
                         }
                         # print(f"{function_obj=}")
                         # Create function in Weaviate and get its ID
-                        function_id = batch.add_data_object(
+                        function_id = weaviate_client.data_object.create(
                             data_object=function_obj, class_name="Function"
                         )
                         # Class -> Function relationship
-                        batch.add_reference(
-                            from_object_class_name="Class",
-                            from_object_uuid=class_id,
+                        weaviate_client.data_object.reference.add(
+                            from_class_name="Class",
+                            from_uuid=class_id,
                             from_property_name="hasFunction",
-                            to_object_class_name="Function",
-                            to_object_uuid=function_id,
+                            to_class_name="Function",
+                            to_uuid=function_id,
                         )
                         # Function -> File relationship
-                        batch.add_reference(
-                            from_object_class_name="Function",
-                            from_object_uuid=function_id,
+                        weaviate_client.data_object.reference.add(
+                            from_class_name="Function",
+                            from_uuid=function_id,
                             from_property_name="belongsToFile",
-                            to_object_class_name="File",
-                            to_object_uuid=file_id,
+                            to_class_name="File",
+                            to_uuid=file_id,
                         )
                         # Function -> Class relationship
-                        batch.add_reference(
-                            from_object_class_name="Function",
-                            from_object_uuid=function_id,
+                        weaviate_client.data_object.reference.add(
+                            from_class_name="Function",
+                            from_uuid=function_id,
                             from_property_name="belongsToClass",
-                            to_object_class_name="Class",
-                            to_object_uuid=class_id,
+                            to_class_name="Class",
+                            to_uuid=class_id,
                         )
                         # File -> Function relationship
-                        batch.add_reference(
-                            from_object_class_name="File",
-                            from_object_uuid=file_id,
+                        weaviate_client.data_object.reference.add(
+                            from_class_name="File",
+                            from_uuid=file_id,
                             from_property_name="hasFunction",
-                            to_object_class_name="Function",
-                            to_object_uuid=function_id,
+                            to_class_name="Function",
+                            to_uuid=function_id,
                         )
                     except AttributeError as e:
-                        print(e)
+                        logging.error(e)
 
     return file_id
 
@@ -369,54 +393,122 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
     Analyzes all Python files in a directory (and its subdirectories), collects a
     list of dictionaries containing filename, function names, and class names for each file.
     """
-    print("analyzing directory")
+    logging.info(f"Analyzing Code Directory {directory=}")
     # File entity
     directory_obj = {
         "name": directory,
         "link": repo_url,
     }
-    print(directory_obj)
     # Create file in Weaviate and get its id
     directory_id = weaviate_client.data_object.create(
         data_object=directory_obj, class_name="Repository"
     )
-    print("created dir")
+    logging.info(
+        f"created directory object in weaviate db {directory_obj=} with {directory_id=}"
+    )
     for root, _, files in os.walk(directory):
-        print(files)
-        weaviate_client.batch.configure(batch_size=20)
-        with weaviate_client.batch as batch:
-            for file in files:
-                if file.endswith(".py"):  # Process only Python files
-                    print("---------")
-                    file_path = os.path.join(root, file)
-                    print(f"{file_path=}---------")
-                    with open(file_path, "r") as f:
-                        file_content = f.read()
-                    file_exists = file_already_exists(
-                        filename=file, link=file_path, client=weaviate_client
+        logging.info(f"Found following files in directory {root=}: {files=}")
+        for file in files:
+            if file.endswith(".py"):  # Process only Python files
+                file_path = os.path.join(root, file)
+                logging.info(
+                    f"Analyzing file {file_path=}, will skip if analysis exists---------"
+                )
+                with open(file_path, "r") as f:
+                    file_content = f.read()
+                file_exists = file_already_exists(
+                    filename=file, link=file_path, client=weaviate_client
+                )
+                if not file_exists:
+                    file_id = parse_file(
+                        file_content, file, file_path, weaviate_client
+                    )  # Analyze the file and add its data to the weaviate db
+                    logging.info(
+                        f"File analysis complete. Analyzed file {file_id=}---------"
                     )
-                    if not file_exists:
-                        file_id = parse_file(
-                            file_content, file, file_path, batch
-                        )  # Analyze the file and add its data to the weaviate db
-                        print(f"{file_id=}---------")
-                        # Repository -> File relationship
-                        batch.add_reference(
-                            from_object_class_name="Repository",
-                            from_object_uuid=directory_id,
-                            from_property_name="hasFile",
-                            to_object_class_name="File",
-                            to_object_uuid=file_id,
-                        )
+                    # Repository -> File relationship
+                    weaviate_client.data_object.reference.add(
+                        from_class_name="Repository",
+                        from_uuid=directory_id,
+                        from_property_name="hasFile",
+                        to_class_name="File",
+                        to_uuid=file_id,
+                    )
 
     return directory_id
 
 
-if __name__ == "__main__":
-    client = get_weaviate_client()
+def clone_repo(repo_url: str, local_dir: Union[str, os.PathLike]) -> None:
+    """
+    Clones a Git repository to a specified local directory.
 
-    analyze_directory(
-        "/Users/zarroukinesrine/Desktop/Projects/LangChainRepos/langchain/libs/langchain/langchain",
-        "https://github.com/langchain-ai/langchain.git",
-        client,
+    :param repo_url: URL of the Git repository to clone.
+    :param local_dir: Local directory path where the repository should be cloned.
+    """
+    try:
+        Repo.clone_from(repo_url, local_dir)
+        logging.info(f"Repository cloned successfully to {local_dir}")
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        raise
+
+
+# Function that checks if repo has been cloned using libname
+# takes libname and repo_dir and finds out if it can find a folder with libname
+def check_if_repo_has_been_cloned(repo_dir: str) -> bool:
+    if os.path.isdir(repo_dir):
+        return True
+    else:
+        return False
+
+
+# Function that queries Weaviate db to find if repo has been processed there.
+# takes repo_dir and client and finds out if it can find data for the repo_dir.
+def check_if_repo_has_been_embedded(repo_dir: str, client: weaviate.Client) -> bool:
+    # query if library already exists and has documentation files
+    result = (
+        client.query.get(
+            "Repository",
+            properties=["name"],
+        )
+        .with_where(
+            {
+                "path": ["name"],
+                "operator": "Equal",
+                "valueText": repo_dir,
+            }
+        )
+        .do()
     )
+    library_exists = result["data"]["Get"]["Repository"]
+    if len(library_exists) == 0:
+        return False
+    else:
+        return True
+
+
+# check if repo has been cloned
+# if not, clone it
+# check if repo has been analyzed
+# if not, analyze it
+if __name__ == "__main__":
+    from codinit.config import secrets
+
+    libname = "langchain"
+    repo_dir = secrets.repo_dir + "/" + libname
+    repo_url = "https://github.com/langchain-ai/langchain.git"
+    if not check_if_repo_has_been_cloned(repo_dir):
+        print("Cloning repo")
+        clone_repo(repo_url, repo_dir)
+    print("Checking if repo has been cloned")
+    print(check_if_repo_has_been_cloned(repo_dir))
+    client = get_weaviate_client()
+    print("Checking if repo has been embedded")
+    print(check_if_repo_has_been_embedded(repo_dir, client))
+    """
+    analyze_directory(
+        directory= repo_dir + "/libs/langchain/langchain",
+        repo_url=repo_url,
+        client=client,
+    )
+    """

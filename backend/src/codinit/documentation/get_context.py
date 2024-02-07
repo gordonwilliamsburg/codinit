@@ -308,16 +308,19 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
                 )
 
     # run
-
     def run(self):
         # get or create library
         lib_id = self.get_or_create_library()
         data = self.get_raw_documentation()
+        n_docs = self.check_library_has_docs(lib_id=lib_id)
         if len(data) == 0:
-            logging.error("No data found.")
-        else:
-            # embed documentation to weaviate
+            logging.error("No raw documentation data found.")
+        elif n_docs == 0:
+            logging.info(
+                "Library has no documentation in weaviate. Embedding documentation now..."
+            )
             self.embed_documentation(data=data, lib_id=lib_id)
+            logging.info("Done embedding documentation.")
 
 
 class WeaviateDocQuerier(BaseWeaviateDocClient):
@@ -355,9 +358,9 @@ class WeaviateDocQuerier(BaseWeaviateDocClient):
         result = re.findall(r'"(.*?)"', query)
         if len(result) > 0:
             query = result[0]
-        print(query)
+        logging.info(f"Retrieving relevant documents for query: {query}")
         docs = self.retriever.get_relevant_documents(query=query)
-        # print(f"{docs=}")
+        logging.info(f"{docs=}")
         relevant_docs = ""
         for doc in docs:
             relevant_docs += doc.page_content
