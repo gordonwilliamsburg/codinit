@@ -455,11 +455,19 @@ def clone_repo(repo_url: str, local_dir: Union[str, os.PathLike]) -> None:
 
 # Function that checks if repo has been cloned using libname
 # takes libname and repo_dir and finds out if it can find a folder with libname
-def check_if_repo_has_been_cloned(repo_dir: str) -> bool:
+def check_if_repo_has_been_cloned(repo_dir: Union[str, os.PathLike]) -> bool:
     if os.path.isdir(repo_dir):
         return True
     else:
         return False
+
+
+def clone_repo_if_not_exists(repo_url: str, local_dir: Union[str, os.PathLike]) -> None:
+    if not check_if_repo_has_been_cloned(local_dir):
+        clone_repo(repo_url, local_dir)
+        logging.info(f"Repository cloned successfully to {local_dir}")
+    else:
+        logging.info(f"Repository has already been cloned to {local_dir}")
 
 
 # Function that queries Weaviate db to find if repo has been processed there.
@@ -497,11 +505,7 @@ if __name__ == "__main__":
     libname = "langchain"
     repo_dir = secrets.repo_dir + "/" + libname
     repo_url = "https://github.com/langchain-ai/langchain.git"
-    if not check_if_repo_has_been_cloned(repo_dir):
-        print("Cloning repo")
-        clone_repo(repo_url, repo_dir)
-    print("Checking if repo has been cloned")
-    print(check_if_repo_has_been_cloned(repo_dir))
+    clone_repo_if_not_exists(repo_url, repo_dir)
     client = get_weaviate_client()
     print("Checking if repo has been embedded")
     print(check_if_repo_has_been_embedded(repo_dir, client))
