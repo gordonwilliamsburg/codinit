@@ -39,6 +39,7 @@ class Item(BaseModel):
     libname: str
     prompt: str
     source_code: str
+    lib_repo_url: str
 
 
 @app.websocket("/ws/")
@@ -56,7 +57,9 @@ async def generate(websocket: WebSocket):
         data = await websocket.receive_json()
         item = Item(**data)
         logging.info(f"item: {item}")
-        library = Library(libname=item.libname, links=item.links)
+        library = Library(
+            libname=item.libname, links=item.links, lib_repo_url=item.lib_repo_url
+        )
         sha, message = get_git_info()
         with open(eval_settings.eval_dataset_location, "a+", newline="") as csvfile:
             fieldnames = [fieldname for fieldname in eval_settings.eval_columns]

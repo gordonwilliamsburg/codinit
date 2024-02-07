@@ -455,11 +455,19 @@ def clone_repo(repo_url: str, local_dir: Union[str, os.PathLike]) -> None:
 
 # Function that checks if repo has been cloned using libname
 # takes libname and repo_dir and finds out if it can find a folder with libname
-def check_if_repo_has_been_cloned(repo_dir: str) -> bool:
+def check_if_repo_has_been_cloned(repo_dir: Union[str, os.PathLike]) -> bool:
     if os.path.isdir(repo_dir):
         return True
     else:
         return False
+
+
+def clone_repo_if_not_exists(repo_url: str, local_dir: Union[str, os.PathLike]) -> None:
+    if not check_if_repo_has_been_cloned(local_dir):
+        clone_repo(repo_url, local_dir)
+        logging.info(f"Repository cloned successfully to {local_dir}")
+    else:
+        logging.info(f"Repository has already been cloned to {local_dir}")
 
 
 # Function that queries Weaviate db to find if repo has been processed there.
@@ -487,6 +495,34 @@ def check_if_repo_has_been_embedded(repo_dir: str, client: weaviate.Client) -> b
         return True
 
 
+# check if library has been embedded to weaviate, otherwise embed it using analyze_directory
+def embed_repository_if_not_exists(
+    repo_dir: str, repo_url: str, client: weaviate.Client
+) -> None:
+    if not check_if_repo_has_been_embedded(repo_dir, client):
+        logging.info(f"Found no embedding for library {repo_dir=}, embedding now...")
+        analyze_directory(
+            directory=repo_dir,
+            repo_url=repo_url,
+            weaviate_client=client,
+        )
+        logging.info(
+            f"Repository {repo_dir=} has now been embedded successfully to Weaviate"
+        )
+    else:
+        logging.info(f"Repository {repo_dir=} has already been embedded to Weaviate")
+
+
+def run_codebase_analysis(
+    repo_dir: str, libname: str, repo_url: str, client: weaviate.Client
+) -> None:
+    logging.info(f"Running analysis for {libname=}")
+    repo_dir = repo_dir + "/" + libname
+    clone_repo_if_not_exists(repo_url, local_dir=repo_dir)
+    embed_repository_if_not_exists(repo_dir, repo_url, client)
+    logging.info(f"Analysis for {libname=} completed successfully")
+
+
 # check if repo has been cloned
 # if not, clone it
 # check if repo has been analyzed
@@ -495,16 +531,12 @@ if __name__ == "__main__":
     from codinit.config import secrets
 
     libname = "langchain"
-    repo_dir = secrets.repo_dir + "/" + libname
+    repo_dir = secrets.repo_dir
     repo_url = "https://github.com/langchain-ai/langchain.git"
-    if not check_if_repo_has_been_cloned(repo_dir):
-        print("Cloning repo")
-        clone_repo(repo_url, repo_dir)
-    print("Checking if repo has been cloned")
-    print(check_if_repo_has_been_cloned(repo_dir))
     client = get_weaviate_client()
-    print("Checking if repo has been embedded")
-    print(check_if_repo_has_been_embedded(repo_dir, client))
+    run_codebase_analysis(
+        repo_dir=repo_dir, libname=libname, repo_url=repo_url, client=client
+    )
     """
     analyze_directory(
         directory= repo_dir + "/libs/langchain/langchain",

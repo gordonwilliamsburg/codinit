@@ -12,13 +12,14 @@ export default function Home() {
 
   const defaultLibName = 'langchain';
   const defaultLibraryURLs = ['https://langchain-langchain.vercel.app/docs/get_started/'];
-
+  const defaultLibraryRepoURL = "https://github.com/langchain-ai/langchain.git";
   const [text, setText] = useState("");
   const [fileContent, setFileContent] = useState('');
   const [codeerrorMsg, setCoderrorMsg] = useState("");
   const [planContent, setPlanContent] = useState<string>('');
   const [libName, setLibName] = useState(defaultLibName); //useState<string>('');
   const [libraryURLs, setLibraryURLs] = useState(defaultLibraryURLs);//useState<string[]>([]); // list library links
+  const [libraryRepoURL, setLibraryRepoURL] = useState(defaultLibraryRepoURL);
   const [textareaContent, setTextareaContent] = useState('');
   const [apiStatus, setApiStatus] = useState<string>("Offline");
   const [generatedCode, setGeneratedCode] = useState<string>('');
@@ -71,7 +72,8 @@ export default function Home() {
         source_code: fileContent,
         prompt: textareaContent,
         links: libraryURLs,
-        libname: libName
+        libname: libName,
+        lib_repo_url: libraryRepoURL
       }));
     };
     ws.onmessage = (event: MessageEvent) => {
@@ -153,7 +155,9 @@ export default function Home() {
           </div>
           <div className="mt-3">
             <p className="text-xs font-mono text-zinc-800 mb-2 text-center"> Select a library you want to use</p>
+
             <div className="flex flex-row gap-4"> {/* Flex container with row direction */}
+
               <div className="flex-1"> {/* First column */}
                 <div className="flex items-center text-zinc-800 font-mono">
                   <textarea
@@ -175,7 +179,18 @@ export default function Home() {
                   />
                 </div>
               </div>
+
             </div>
+
+            <div className="flex items-center text-zinc-800 font-mono">
+            <textarea
+              placeholder='Set Library Repository URL'
+              value={libraryRepoURL}
+              onChange={(e) => setLibraryRepoURL(e.target.value)}
+              className="w-full bg-white text-zinc-800 outline-none font-mono p-3 rounded-lg"
+            />
+          </div>
+
           </div>
           <div className="flex justify-center mt-4">
             <button

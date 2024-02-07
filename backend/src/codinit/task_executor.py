@@ -18,6 +18,7 @@ from codinit.agents import (
     planner_agent,
 )
 from codinit.code_editor import PythonCodeEditor
+from codinit.codebaseKG import run_codebase_analysis
 from codinit.config import eval_settings, secrets
 
 # from codinit.get_context import get_embedding_store, get_read_the_docs_context
@@ -173,6 +174,12 @@ class TaskExecutor:
     def init_library(self, library: Library, client: weaviate.Client):
         weaviate_doc_loader = WeaviateDocLoader(library=library, client=client)
         weaviate_doc_loader.run()
+        run_codebase_analysis(
+            repo_dir=secrets.repo_dir,
+            libname=library.libname,
+            repo_url=library.lib_repo_url,
+            client=client,
+        )
 
     def get_docs(self, library: Library, task: str, client: weaviate.Client):
         weaviate_doc_querier = WeaviateDocQuerier(library=library, client=client)
