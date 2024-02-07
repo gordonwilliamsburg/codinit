@@ -513,6 +513,16 @@ def embed_repository_if_not_exists(
         logging.info(f"Repository {repo_dir=} has already been embedded to Weaviate")
 
 
+def run_codebase_analysis(
+    repo_dir: str, libname: str, repo_url: str, client: weaviate.Client
+) -> None:
+    logging.info(f"Running analysis for {libname=}")
+    repo_dir = repo_dir + "/" + libname
+    clone_repo_if_not_exists(repo_url, local_dir=repo_dir)
+    embed_repository_if_not_exists(repo_dir, repo_url, client)
+    logging.info(f"Analysis for {libname=} completed successfully")
+
+
 # check if repo has been cloned
 # if not, clone it
 # check if repo has been analyzed
@@ -521,11 +531,12 @@ if __name__ == "__main__":
     from codinit.config import secrets
 
     libname = "langchain"
-    repo_dir = secrets.repo_dir + "/" + libname
+    repo_dir = secrets.repo_dir
     repo_url = "https://github.com/langchain-ai/langchain.git"
-    clone_repo_if_not_exists(repo_url, repo_dir)
     client = get_weaviate_client()
-    embed_repository_if_not_exists(repo_dir, repo_url, client)
+    run_codebase_analysis(
+        repo_dir=repo_dir, libname=libname, repo_url=repo_url, client=client
+    )
     """
     analyze_directory(
         directory= repo_dir + "/libs/langchain/langchain",
