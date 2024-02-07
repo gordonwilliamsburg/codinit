@@ -1,15 +1,18 @@
+import shutil
 import pytest
 import os
-from codinit.codebaseKG import clone_repo, check_if_repo_has_been_cloned, check_if_repo_has_been_embedded
-from unittest.mock import Mock
+from codinit.codebaseKG import clone_repo, check_if_repo_has_been_cloned, check_if_repo_has_been_embedded, clone_repo_if_not_exists, embed_repository_if_not_exists
+from unittest.mock import Mock, patch
+@pytest.fixture
+def repo_url():
+    return "https://github.com/gordonwilliamsburg/test-repo.git"
 
 # Test the clone_repo function
 
-def test_clone_repo_success(tmp_path):
+def test_clone_repo_success(tmp_path, repo_url):
     """
     Test successful cloning of a repository.
     """
-    repo_url = "https://github.com/gordonwilliamsburg/test-repo.git"  # Replace with a real repo URL for testing
     local_dir = tmp_path / "test_repo"
 
     clone_repo(repo_url, str(local_dir))
@@ -27,11 +30,10 @@ def test_clone_repo_invalid_url(tmp_path):
     with pytest.raises(Exception):
         clone_repo(repo_url, str(local_dir))
 
-def test_clone_repo_with_readme(tmp_path):
+def test_clone_repo_with_readme(tmp_path, repo_url):
     """
     Test that the repository with only a README file is cloned successfully.
     """
-    repo_url = "https://github.com/gordonwilliamsburg/test-repo.git"  # Replace with your repository URL
     local_dir = tmp_path / "test_repo"
 
     clone_repo(repo_url, str(local_dir))
@@ -90,3 +92,74 @@ def test_check_if_repo_has_been_embedded_returns_false_if_repo_does_not_exist_in
 
     # Test with non-existing repo
     assert check_if_repo_has_been_embedded(repo_dir, mock_client) is False
+
+# Test for clone_repo_if_not_exists
+def setup_function(function):
+    # Setup that runs before each test function
+    # Create a clean directory for cloning
+    os.makedirs("/tmp/test_clone_repo", exist_ok=True)
+
+def teardown_function(function):
+    # Teardown that runs after each test function
+    # Clean up the directory
+    shutil.rmtree("/tmp/test_clone_repo")
+
+def test_clone_repo_if_not_exists_not_cloned(repo_url):
+    local_dir = "/tmp/test_clone_repo"
+
+    # Test cloning when the repo hasn't been cloned yet
+    clone_repo_if_not_exists(repo_url, local_dir)
+
+    # Check if the repo is cloned
+    assert os.path.isdir(local_dir)
+    # Further checks can be added to verify the contents of the cloned repo
+
+def test_clone_repo_if_not_exists_already_cloned(repo_url):
+    local_dir = "/tmp/test_clone_repo"
+
+    # First clone to ensure the repo is already there
+    clone_repo_if_not_exists(repo_url, local_dir)
+
+    # Test cloning again when the repo has already been cloned
+    clone_repo_if_not_exists(repo_url, local_dir)
+
+    # The test here can be to check that it didn't re-clone unnecessarily
+    # Use patch to capture logging output
+    with patch('logging.info') as mock_logging_info:
+        # Test cloning again when the repo has already been cloned
+        clone_repo_if_not_exists(repo_url, local_dir)
+
+        # Check that the specific log message was emitted
+        mock_logging_info.assert_called_with(f"Repository has already been cloned to {local_dir}")
+
+def setup_test_repo(tmp_path):
+    # Create a temporary directory to mimic a repository
+    test_repo_dir = tmp_path / "test_repo"
+    test_repo_dir.mkdir()
+    # Add test files or directories as needed
+    return test_repo_dir
+
+@pytest.fixture
+def test_repo_dir(tmp_path):
+    return setup_test_repo(tmp_path)
+
+def test_embed_repository_if_not_exists(test_embedded_weaviate_client, test_repo_dir, repo_url):
+
+    # Test embedding when the repo has not been embedded yet
+    embed_repository_if_not_exists(str(test_repo_dir), repo_url, test_embedded_weaviate_client)
+
+    # Verify the repository is now embedded
+    assert check_if_repo_has_been_embedded(str(test_repo_dir), test_embedded_weaviate_client)
+
+
+def test_embed_repository_if_not_exists_already_embedded_does_not_reembed(test_embedded_weaviate_client, test_repo_dir, repo_url):
+    # Test embedding when the repo has not been embedded yet
+    embed_repository_if_not_exists(str(test_repo_dir), repo_url, test_embedded_weaviate_client)
+
+    # Use patch to capture logging output
+    with patch('logging.info') as mock_logging_info:
+        # Test embedding again when the repo has already been embedded
+        embed_repository_if_not_exists(str(test_repo_dir), repo_url, test_embedded_weaviate_client)
+
+        # Check that the specific log message was emitted
+        mock_logging_info.assert_any_call(f"Repository {str(test_repo_dir)}= has already been embedded to Weaviate")
