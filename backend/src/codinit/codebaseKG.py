@@ -495,6 +495,24 @@ def check_if_repo_has_been_embedded(repo_dir: str, client: weaviate.Client) -> b
         return True
 
 
+# check if library has been embedded to weaviate, otherwise embed it using analyze_directory
+def embed_repository_if_not_exists(
+    repo_dir: str, repo_url: str, client: weaviate.Client
+) -> None:
+    if not check_if_repo_has_been_embedded(repo_dir, client):
+        logging.info(f"Found no embedding for library {repo_dir=}, embedding now...")
+        analyze_directory(
+            directory=repo_dir,
+            repo_url=repo_url,
+            weaviate_client=client,
+        )
+        logging.info(
+            f"Repository {repo_dir=} has now been embedded successfully to Weaviate"
+        )
+    else:
+        logging.info(f"Repository {repo_dir=} has already been embedded to Weaviate")
+
+
 # check if repo has been cloned
 # if not, clone it
 # check if repo has been analyzed
@@ -507,8 +525,7 @@ if __name__ == "__main__":
     repo_url = "https://github.com/langchain-ai/langchain.git"
     clone_repo_if_not_exists(repo_url, repo_dir)
     client = get_weaviate_client()
-    print("Checking if repo has been embedded")
-    print(check_if_repo_has_been_embedded(repo_dir, client))
+    embed_repository_if_not_exists(repo_dir, repo_url, client)
     """
     analyze_directory(
         directory= repo_dir + "/libs/langchain/langchain",

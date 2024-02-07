@@ -1,7 +1,7 @@
 import shutil
 import pytest
 import os
-from codinit.codebaseKG import clone_repo, check_if_repo_has_been_cloned, check_if_repo_has_been_embedded, clone_repo_if_not_exists
+from codinit.codebaseKG import clone_repo, check_if_repo_has_been_cloned, check_if_repo_has_been_embedded, clone_repo_if_not_exists, embed_repository_if_not_exists
 from unittest.mock import Mock, patch
 @pytest.fixture
 def repo_url():
@@ -131,3 +131,35 @@ def test_clone_repo_if_not_exists_already_cloned(repo_url):
 
         # Check that the specific log message was emitted
         mock_logging_info.assert_called_with(f"Repository has already been cloned to {local_dir}")
+
+def setup_test_repo(tmp_path):
+    # Create a temporary directory to mimic a repository
+    test_repo_dir = tmp_path / "test_repo"
+    test_repo_dir.mkdir()
+    # Add test files or directories as needed
+    return test_repo_dir
+
+@pytest.fixture
+def test_repo_dir(tmp_path):
+    return setup_test_repo(tmp_path)
+
+def test_embed_repository_if_not_exists(test_embedded_weaviate_client, test_repo_dir, repo_url):
+
+    # Test embedding when the repo has not been embedded yet
+    embed_repository_if_not_exists(str(test_repo_dir), repo_url, test_embedded_weaviate_client)
+
+    # Verify the repository is now embedded
+    assert check_if_repo_has_been_embedded(str(test_repo_dir), test_embedded_weaviate_client)
+
+
+def test_embed_repository_if_not_exists_already_embedded_does_not_reembed(test_embedded_weaviate_client, test_repo_dir, repo_url):
+    # Test embedding when the repo has not been embedded yet
+    embed_repository_if_not_exists(str(test_repo_dir), repo_url, test_embedded_weaviate_client)
+
+    # Use patch to capture logging output
+    with patch('logging.info') as mock_logging_info:
+        # Test embedding again when the repo has already been embedded
+        embed_repository_if_not_exists(str(test_repo_dir), repo_url, test_embedded_weaviate_client)
+
+        # Check that the specific log message was emitted
+        mock_logging_info.assert_any_call(f"Repository {str(test_repo_dir)}= has already been embedded to Weaviate")
