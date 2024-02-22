@@ -51,6 +51,7 @@ class TaskExecutionConfig(BaseModel):
     coder_temperature: float = 0.0
     code_corrector_temperature: float = 0
     dependency_tracker_temperature: float = 0
+    lint_correction_threshold: int = 3
 
 
 class TaskExecutor:
@@ -225,21 +226,23 @@ class TaskExecutor:
         }
         self.csv_writer.writerow(row_dict)
 
-    def code_correction_with_linting(
+    def lint_and_correct_with_llm(
         self,
         new_code: str,
-        deps: List[str],
         relevant_docs: str,
-        attempt: int,
+        deps: List[str],
         time_stamp: str,
     ):
+        lint_attempt = 0
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
         )
-        # feed in lint results
         logging.info(f"{lint_result=}")
-        # TODO: check if linting output is not empty
-        if len(lint_result) > 0:
+        while (
+            len(lint_result) > 0
+            and lint_attempt < self.config.lint_correction_threshold
+        ):
+            lint_attempt += 1
             lint_query_results = self.linter.execute(
                 source_code=new_code, linter_output=lint_result
             )
@@ -260,15 +263,68 @@ class TaskExecutor:
             formatted_code, lint_result, metric = self.format_lint_code(
                 code=new_code, dependencies=deps
             )
-        # run generated code
-        error = self.run_code(formatted_code)
-        # file has header: Run_ID,Task_ID,Task,Generation_ID,Code,Linter_Output,Metric,Error_Log,Git_SHA,Commit_Message,Timestamp
+        self.write_row(
+            attempt=lint_attempt,
+            formatted_code=formatted_code,
+            lint_result=lint_result,
+            metric=metric,
+            error="no runtime",
+            time_stamp=time_stamp,
+        )
+        return formatted_code
+
+    def runtime_and_correct_with_llm(
+        self,
+        new_code: str,
+        relevant_docs: str,
+        attempt: int,
+        deps: List[str],
+        time_stamp: str,
+    ):
+        error = self.run_code(new_code)
+        new_code = self.code_corrector.execute(
+            tool_choice="execute_code",
+            chat_history=[],
+            task=self.task,
+            context=relevant_docs,
+            source_code=new_code,
+            error=error,
+        )[0]
+        formatted_code, lint_result, metric = self.format_lint_code(
+            code=new_code, dependencies=deps
+        )
+        error = self.run_code(new_code)
         self.write_row(
             attempt=attempt,
             formatted_code=formatted_code,
             lint_result=lint_result,
             metric=metric,
             error=error,
+            time_stamp=time_stamp,
+        )
+        return error, new_code
+
+    def code_correction_with_linting(
+        self,
+        new_code: str,
+        deps: List[str],
+        relevant_docs: str,
+        attempt: int,
+        time_stamp: str,
+    ):
+        # lint code and correct linting errors in a loop
+        linted_code = self.lint_and_correct_with_llm(
+            new_code=new_code,
+            relevant_docs=relevant_docs,
+            deps=deps,
+            time_stamp=time_stamp,
+        )
+        # run generated code and correct resulting error
+        error, new_code = self.runtime_and_correct_with_llm(
+            new_code=linted_code,
+            relevant_docs=relevant_docs,
+            attempt=attempt,
+            deps=deps,
             time_stamp=time_stamp,
         )
         return error, new_code
