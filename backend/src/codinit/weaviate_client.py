@@ -21,3 +21,8 @@ def get_weaviate_client():
         },
     )
     return client
+
+
+if __name__ == "__main__":
+    client = get_weaviate_client()
+    print(client.schema.get())
