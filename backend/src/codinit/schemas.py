@@ -1,473 +1,212 @@
+import weaviate
+import weaviate.classes.config as wvcc
+
 from codinit.weaviate_client import get_weaviate_client
 
-# define knowledge graph schema
-schema = {
-    "classes": [
-        {
-            "class": "Repository",
-            "description": "A code repository",
-            "vectorizer": "text2vec-huggingface",
-            "vectorIndexType": "hnsw",
-            "moduleConfig": {
-                "text2vec-huggingface": {
-                    "vectorizeClassName": True,
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
-                    "options": {"waitForModel": True},
-                }
-            },
-            "properties": [
-                {
-                    "name": "name",
-                    "dataType": ["text"],
-                    "description": "name of the repository",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "link",
-                    "dataType": ["text"],
-                    "description": "URL link to the remote repository",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "hasFile",
-                    "dataType": ["File"],
-                    "description": "Files contained in the repository",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-            ],
-        },
-        {
-            "class": "File",
-            "description": "A file in a repository",
-            "vectorizer": "text2vec-huggingface",
-            "vectorIndexType": "hnsw",
-            "moduleConfig": {
-                "text2vec-huggingface": {
-                    "vectorizeClassName": True,
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
-                    "options": {"waitForModel": True},
-                }
-            },
-            "properties": [
-                {
-                    "name": "name",
-                    "dataType": ["text"],
-                    "description": "Name of the file",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "link",
-                    "dataType": ["text"],
-                    "description": "Full link of the file in the remote repository",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "description",
-                    "dataType": ["text"],
-                    "description": "An LLM generated description of the file",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "hasImport",
-                    "dataType": ["Import"],
-                    "description": "Imports in the file",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "hasClass",
-                    "dataType": ["Class"],
-                    "description": "Classes defined in the file",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "hasFunction",
-                    "dataType": ["Function"],
-                    "description": "Functions defined in the file",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-            ],
-        },
-        {
-            "class": "Import",
-            "description": "An import in a file",
-            "vectorizer": "text2vec-huggingface",
-            "vectorIndexType": "hnsw",
-            "moduleConfig": {
-                "text2vec-huggingface": {
-                    "vectorizeClassName": True,
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
-                    "options": {"waitForModel": True},
-                }
-            },
-            "properties": [
-                {
-                    "name": "name",
-                    "dataType": ["text"],
-                    "description": "Name of the import",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": True,
-                            "vectorizeClassName": True,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "belongsToFile",
-                    "dataType": ["File"],
-                    "description": "File the import is located in",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": True,
-                            "vectorizeClassName": True,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-            ],
-        },
-        {
-            "class": "Class",
-            "description": "A class in a file",
-            "vectorizer": "text2vec-huggingface",
-            "vectorIndexType": "hnsw",
-            "moduleConfig": {
-                "text2vec-huggingface": {
-                    "vectorizeClassName": True,
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
-                    "options": {"waitForModel": True},
-                }
-            },
-            "properties": [
-                {
-                    "name": "name",
-                    "dataType": ["text"],
-                    "description": "Name of the class",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "description",
-                    "dataType": ["text"],
-                    "description": "An LLM generated description of the class",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "attributes",
-                    "dataType": ["text[]"],
-                    "description": "attributes of the class",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "hasFunction",
-                    "dataType": ["Function"],
-                    "description": "Functions defined in the class",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "belongsToFile",
-                    "dataType": ["File"],
-                    "description": "File the class is defined in",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-            ],
-        },
-        {
-            "class": "Function",
-            "description": "A function in a file or class",
-            "vectorizer": "text2vec-huggingface",
-            "vectorIndexType": "hnsw",
-            "moduleConfig": {
-                "text2vec-huggingface": {
-                    "vectorizeClassName": True,
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
-                    "options": {"waitForModel": True},
-                }
-            },
-            "properties": [
-                {
-                    "name": "name",
-                    "dataType": ["text"],
-                    "description": "Name of the function",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "description",
-                    "dataType": ["text"],
-                    "description": "An LLM generated description of the function",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": False,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "code",
-                    "dataType": ["text"],
-                    "description": "Code body of the function",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "parameters",
-                    "dataType": ["text[]"],
-                    "description": "Parameters of the function",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "variables",
-                    "dataType": ["text[]"],
-                    "description": "Variables used in the function",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "return_value",
-                    "dataType": ["text[]"],
-                    "description": "Return values of the function",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "belongsToFile",
-                    "dataType": ["File"],
-                    "description": "File the function is defined in",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-                {
-                    "name": "belongsToClass",
-                    "dataType": ["Class"],
-                    "description": "Class the function is part of",
-                    "moduleConfig": {
-                        "text2vec-huggingface": {
-                            "skip": True,
-                            "vectorizePropertyName": False,
-                            "vectorizeClassName": False,
-                            "model": "sentence-transformers/all-MiniLM-L6-v2",
-                            "options": {"waitForModel": True},
-                        }
-                    },
-                },
-            ],
-        },
-    ]
-}
 
-import_class_schema = {
-    "class": "Import",
-    "description": "An import in a file",
-    "vectorizer": "text2vec-huggingface",
-    "vectorIndexType": "hnsw",
-    "moduleConfig": {
-        "text2vec-huggingface": {
-            "vectorizeClassName": True,
-            "model": "sentence-transformers/all-MiniLM-L6-v2",
-            "options": {"waitForModel": True},
-        }
-    },
-    "properties": [
-        {
-            "name": "name",
-            "dataType": ["text"],
-            "description": "Name of the import",
-            "moduleConfig": {
-                "text2vec-huggingface": {
-                    "skip": False,
-                    "vectorizePropertyName": True,
-                    "vectorizeClassName": True,
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
-                    "options": {"waitForModel": True},
-                }
-            },
-        },
-        {
-            "name": "belongsToFile",
-            "dataType": ["File"],
-            "description": "File the import is located in",
-            "moduleConfig": {
-                "text2vec-huggingface": {
-                    "skip": False,
-                    "vectorizePropertyName": True,
-                    "vectorizeClassName": True,
-                    "model": "sentence-transformers/all-MiniLM-L6-v2",
-                    "options": {"waitForModel": True},
-                }
-            },
-        },
-    ],
-}
+def create_kg_schema(client: weaviate.WeaviateClient):
+    try:
+        # Create the Repository collection
+        repository_collection = client.collections.create(
+            name="Repository",
+            vectorizer_config=wvcc.Configure.Vectorizer.text2vec_openai(
+                model="ada", model_version="002"
+            ),
+            properties=[
+                wvcc.Property(
+                    name="name",
+                    data_type=wvcc.DataType.TEXT,
+                    description="name of the repository",
+                ),
+                wvcc.Property(
+                    name="link",
+                    data_type=wvcc.DataType.TEXT,
+                    description="URL link to the remote repository",
+                    skip_vectorization=True,
+                ),
+            ],
+            vector_index_config=wvcc.Configure.VectorIndex.hnsw(),
+        )
+
+        # Create the File collection
+        file_collection = client.collections.create(
+            name="File",
+            vectorizer_config=wvcc.Configure.Vectorizer.text2vec_openai(
+                model="ada", model_version="002"
+            ),
+            properties=[
+                wvcc.Property(
+                    name="name",
+                    data_type=wvcc.DataType.TEXT,
+                    description="Name of the file",
+                ),
+                wvcc.Property(
+                    name="link",
+                    data_type=wvcc.DataType.TEXT,
+                    description="Full link of the file in the remote repository",
+                    skip_vectorization=True,
+                ),
+                wvcc.Property(
+                    name="description",
+                    data_type=wvcc.DataType.TEXT,
+                    description="An LLM generated description of the file",
+                )
+                # Note: The reference properties will be added later
+            ],
+            vector_index_config=wvcc.Configure.VectorIndex.hnsw(),
+        )
+
+        # Create the Import collection
+        import_collection = client.collections.create(
+            name="Import",
+            vectorizer_config=wvcc.Configure.Vectorizer.text2vec_openai(
+                model="ada", model_version="002"
+            ),
+            properties=[
+                wvcc.Property(
+                    name="name",
+                    data_type=wvcc.DataType.TEXT,
+                    description="Name of the import",
+                )
+                # Note: The 'belongsToFile' property will be a reference and is added later
+            ],
+            vector_index_config=wvcc.Configure.VectorIndex.hnsw(),
+        )
+
+        # Create the Class collection
+        class_collection = client.collections.create(
+            name="Class",
+            vectorizer_config=wvcc.Configure.Vectorizer.text2vec_openai(
+                model="ada", model_version="002"
+            ),
+            properties=[
+                wvcc.Property(
+                    name="name",
+                    data_type=wvcc.DataType.TEXT,
+                    description="Name of the class",
+                ),
+                wvcc.Property(
+                    name="description",
+                    data_type=wvcc.DataType.TEXT,
+                    description="An LLM generated description of the class",
+                ),
+                wvcc.Property(
+                    name="attributes",
+                    data_type=wvcc.DataType.TEXT_ARRAY,
+                    description="attributes of the class",
+                    skip_vectorization=True,
+                )
+                # Note: The reference properties will be added later
+            ],
+            vector_index_config=wvcc.Configure.VectorIndex.hnsw(),
+        )
+
+        # Create the Function collection without reference properties
+        function_collection = client.collections.create(
+            name="Function",
+            vectorizer_config=wvcc.Configure.Vectorizer.text2vec_openai(
+                model="ada", model_version="002"
+            ),
+            vector_index_config=wvcc.Configure.VectorIndex.hnsw(),
+            properties=[
+                wvcc.Property(
+                    name="name",
+                    data_type=wvcc.DataType.TEXT,
+                    description="Name of the function",
+                    skip_vectorization=True,
+                ),
+                wvcc.Property(
+                    name="description",
+                    data_type=wvcc.DataType.TEXT,
+                    description="An LLM generated description of the function",
+                ),
+                wvcc.Property(
+                    name="code",
+                    data_type=wvcc.DataType.TEXT,
+                    description="Code body of the function",
+                    skip_vectorization=True,
+                ),
+                # Other properties as required
+            ],
+        )
+
+        """
+        Adding references
+        """
+        # Add the reference property to the Repository collection
+        repository_collection.config.add_reference(
+            ref=wvcc.ReferenceProperty(
+                name="hasFile",
+                target_collection="File",
+                description="Files contained in the repository",
+            )
+        )
+
+        # Add reference properties to the File collection
+        for reference in ["hasImport", "hasClass", "hasFunction"]:
+            file_collection.config.add_reference(
+                ref=wvcc.ReferenceProperty(
+                    name=reference,
+                    target_collection=reference[
+                        3:
+                    ],  # Assuming collection names are "Import", "Class", "Function"
+                    description=f"{reference[3:]}s defined in the file",
+                )
+            )
+
+        # Add the reference property to the Import collection
+        import_collection.config.add_reference(
+            ref=wvcc.ReferenceProperty(
+                name="belongsToFile",
+                target_collection="File",
+                description="File the import is located in",
+            )
+        )
+
+        # Add 'hasFunction' reference property to the Class collection
+        class_collection.config.add_reference(
+            ref=wvcc.ReferenceProperty(
+                name="hasFunction",
+                target_collection="Function",
+                description="Functions defined in the class",
+            )
+        )
+
+        # Add 'belongsToFile' reference property to the Class collection
+        class_collection.config.add_reference(
+            ref=wvcc.ReferenceProperty(
+                name="belongsToFile",
+                target_collection="File",
+                description="File the class is defined in",
+            )
+        )
+
+        # Add function properties
+        reference_properties = ["belongsToFile", "belongsToClass"]
+
+        # Loop through each reference property and add it to the Function collection
+        for reference in reference_properties:
+            target_collection = (
+                reference[9:] if reference.startswith("belongsTo") else reference
+            )
+            description = (
+                f"{target_collection} the function is part of"
+                if target_collection == "Class"
+                else "File the function is defined in"
+            )
+            function_collection.config.add_reference(
+                ref=wvcc.ReferenceProperty(
+                    name=reference,
+                    target_collection=target_collection,
+                    description=description,
+                )
+            )
+    finally:
+        client.close()
+
+
 if __name__ == "__main__":
     client = get_weaviate_client()
 
-    # create schema
-    client.schema.delete_class("Repository")
-    client.schema.delete_class("File")
-    client.schema.delete_class("Class")
-    client.schema.delete_class("Function")
-    client.schema.delete_class("Import")
-    client.schema.create(schema=schema)
-    # client.schema.create_class(import_class_schema)
+    client.collections.delete_all()
+    create_kg_schema(client)
