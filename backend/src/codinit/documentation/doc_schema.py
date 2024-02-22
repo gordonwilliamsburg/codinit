@@ -1,8 +1,11 @@
 import weaviate
 import weaviate.classes.config as wvcc
 
+from codinit.weaviate_utils import get_collection_references
 
-def create_documentation_schema(client: weaviate.WeaviateClient):
+
+def create_library_schema(client: weaviate.WeaviateClient):
+    client.connect()
     try:
         # Create the Library collection
         library_collection = client.collections.create(
@@ -16,7 +19,14 @@ def create_documentation_schema(client: weaviate.WeaviateClient):
                 wvcc.Property(name="description", data_type=wvcc.DataType.TEXT),
             ],
         )
+    finally:
+        client.close()
+    return library_collection
 
+
+def create_documentation_schema(client: weaviate.WeaviateClient):
+    client.connect()
+    try:
         # Create the DocumentationFile collection
         documentation_file_collection = client.collections.create(
             name="DocumentationFile",
@@ -56,25 +66,66 @@ def create_documentation_schema(client: weaviate.WeaviateClient):
                 ),
             ],
         )
+    finally:
+        client.close()
+    return documentation_file_collection
 
-        library_collection.config.add_reference(
-            ref=wvcc.ReferenceProperty(
-                name="hasDocumentationFile",
-                target_collection="DocumentationFile",
-                description="Documentation of the library",
-            )
-        )
 
-        documentation_file_collection.config.add_reference(
-            ref=wvcc.ReferenceProperty(
-                name="fromLibrary",
-                target_collection="Library",
-                description="The library the documentation belongs to",
+def create_doc_library_schema(client: weaviate.WeaviateClient):
+    client.connect()
+    try:
+        collections = client.collections.list_all()
+        collection_names = set(collections.keys())
+
+        if "Library" not in collection_names:
+            create_library_schema(client)
+        if "DocumentationFile" not in collection_names:
+            create_documentation_schema(client)
+    finally:
+        client.close()
+
+
+# Create the schema
+def add_documentation_schema_references(client: weaviate.WeaviateClient):
+    client.connect()
+
+    try:
+        library_collection = client.collections.get("Library")
+        library_references = get_collection_references(collection=library_collection)
+        if "hasDocumentationFile" not in library_references:
+            library_collection.config.add_reference(
+                ref=wvcc.ReferenceProperty(
+                    name="hasDocumentationFile",
+                    target_collection="DocumentationFile",
+                    description="Documentation of the library",
+                )
             )
+
+        documentation_file_collection = client.collections.get("DocumentationFile")
+        documentation_file_references = get_collection_references(
+            collection=documentation_file_collection
         )
+        if "fromLibrary" not in documentation_file_references:
+            documentation_file_collection.config.add_reference(
+                ref=wvcc.ReferenceProperty(
+                    name="fromLibrary",
+                    target_collection="Library",
+                    description="The library the documentation belongs to",
+                )
+            )
     finally:
         client.close()
     return library_collection, documentation_file_collection
+
+
+def init_library_schema_weaviate(client: weaviate.WeaviateClient):
+    client.connect()
+
+    try:
+        create_doc_library_schema(client)
+        add_documentation_schema_references(client)
+    finally:
+        client.close()
 
 
 # Create the schema
@@ -82,5 +133,4 @@ if __name__ == "__main__":
     from codinit.weaviate_client import get_weaviate_client
 
     client = get_weaviate_client()
-    client.collections.delete_all()
-    library_class, documentation_file_class = create_documentation_schema(client)
+    init_library_schema_weaviate(client)
