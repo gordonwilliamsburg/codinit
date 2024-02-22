@@ -6,6 +6,7 @@ from typing import Union
 import libcst
 import openai
 import weaviate
+import weaviate.classes as wvc
 from git import Repo
 from openai import RateLimitError
 
@@ -53,36 +54,55 @@ def call_GPT(user_prompt: str, modelname: str = "gpt-3.5-turbo-1106"):
         raise  # Re-raise the exception to trigger the retry mechanism
 
 
-def file_already_exists(filename: str, link: str, client: weaviate.Client) -> bool:
+def file_already_exists(
+    filename: str, link: str, client: weaviate.WeaviateClient
+) -> bool:
     """
     Checks if a file has already been visited before so it can be skipped.
     """
+    client.connect()
     try:
-        result = (
-            client.query.get(
-                "File",  # 'File' is the weaviate class name
-                properties=["link"],  # retrieve the 'link' property
-            )
-            .with_where(
-                {"path": ["name"], "operator": "Equal", "valueString": filename}
-            )
-            .do()
+        file_collection = client.collections.get("File")
+        # query if library already exists and has documentation files
+        query_file_result = file_collection.query.fetch_objects(
+            return_properties=["name"],
+            filters=wvc.query.Filter.by_property("name").equal(filename),
+            limit=5,
         )
-
-        logging.debug(f"Query result: {result}")
+        logging.debug(f"Query if file already exists: {query_file_result=}")
 
         # Process the result to check if a file with the same link exists
         file_exists = False
-        for item in result["data"]["Get"]["File"]:
-            if item["link"] == link:
+        for item in query_file_result.objects:
+            if item.properties["link"] == link:
                 file_exists = True
                 break
-
         return file_exists
 
     except Exception as e:
         logging.error(f"Error in querying Weaviate: {e}")
+        client.close()
         return False
+
+
+# Function that queries Weaviate db to find if repo has been processed there.
+# takes repo_dir and client and finds out if it can find data for the repo_dir.
+def check_if_repo_has_been_embedded(
+    repo_dir: str, client: weaviate.WeaviateClient
+) -> bool:
+    client.connect()
+    repository_collection = client.collections.get("Repository")
+    repository_query_result = repository_collection.query.fetch_objects(
+        return_properties=["name"],
+        filters=wvc.query.Filter.by_property("name").equal(repo_dir),
+        limit=5,
+    )
+    client.close()
+    library_exists = repository_query_result.objects
+    if len(library_exists) == 0:
+        return False
+    else:
+        return True
 
 
 def get_full_name(node):
@@ -160,17 +180,26 @@ def extract_attributes(class_node):
 
 # TODO handle out of context length for descriptions
 def parse_file(
-    file_content: str, file_name: str, link: str, weaviate_client: weaviate.Client
+    file_content: str,
+    file_name: str,
+    link: str,
+    weaviate_client: weaviate.WeaviateClient,
 ):
+    weaviate_client.connect()
     """Parse a single file and store its entities and their relationships in Weaviate."""
 
     # takes the Python source code (stored as a string in file_content) and parses it into an AST, which is stored in module.
     module = libcst.parse_module(file_content)
     # File entity
     file = {"name": file_name, "link": link}
-    # Create file in Weaviate and get its id
-    file_id = weaviate_client.data_object.create(data_object=file, class_name="File")
 
+    file_collection = weaviate_client.collections.get("File")
+    import_collection = weaviate_client.collections.get("Import")
+    function_collection = weaviate_client.collections.get("Function")
+    class_collection = weaviate_client.collections.get("Class")
+    # Create file in Weaviate and get its id
+    file_id = file_collection.data.insert(properties=file)
+    logging.debug(f"Embedded file {file_name} with {file_id=}")
     # Repository -> File relationship
     for node in module.children:
         if isinstance(node, libcst.SimpleStatementLine):
@@ -191,18 +220,15 @@ def parse_file(
                         "name": import_name,
                     }
                     # print(f"{import_obj=}")
+
                     # Create import in Weaviate and get its ID
-                    import_id = weaviate_client.data_object.create(
-                        data_object=import_obj, class_name="Import"
-                    )
+                    import_id = import_collection.data.insert(properties=import_obj)
 
                     # File -> Import relationship
-                    weaviate_client.data_object.reference.add(
-                        from_class_name="File",
+                    file_collection.data.reference_add(
                         from_uuid=file_id,
-                        from_property_name="hasImport",
-                        to_class_name="Import",
-                        to_uuid=import_id,
+                        to=import_id,
+                        from_property="hasImport",
                     )
 
             elif isinstance(node, libcst.Import):
@@ -215,26 +241,20 @@ def parse_file(
                     }
                     # print(f"{import_obj=}")
                     # Create import in Weaviate and get its ID
-                    import_id = weaviate_client.data_object.create(
-                        data_object=import_obj, class_name="Import"
-                    )
+                    import_id = import_collection.data.insert(properties=import_obj)
 
                     # File -> Import relationship
-                    weaviate_client.data_object.reference.add(
-                        from_class_name="File",
+                    file_collection.data.reference_add(
                         from_uuid=file_id,
-                        from_property_name="hasImport",
-                        to_class_name="Import",
-                        to_uuid=import_id,
+                        to=import_id,
+                        from_property="hasImport",
                     )
 
                     # Import -> File relationship
-                    weaviate_client.data_object.reference.add(
-                        from_class_name="Import",
+                    import_collection.data.reference_add(
                         from_uuid=import_id,
-                        from_property_name="belongsToFile",
-                        to_class_name="File",
-                        to_uuid=file_id,
+                        from_property="belongsToFile",
+                        to=file_id,
                     )
 
         elif isinstance(node, libcst.FunctionDef):
@@ -262,17 +282,13 @@ def parse_file(
             }
             # print(f"{function_obj=}")
             # Create function in Weaviate and get its ID
-            function_id = weaviate_client.data_object.create(
-                data_object=function_obj, class_name="Function"
-            )
+            function_id = function_collection.data.insert(properties=function_obj)
 
             # File -> Function relationship
-            weaviate_client.data_object.reference.add(
-                from_class_name="File",
+            file_collection.data.reference_add(
                 from_uuid=file_id,
-                from_property_name="hasFunction",
-                to_class_name="Function",
-                to_uuid=function_id,
+                from_property="hasFunction",
+                to=function_id,
             )
 
             # TODO Function -> Code relationship
@@ -306,17 +322,13 @@ def parse_file(
             logging.info(f"Created class object {class_obj=}")
 
             # Create class in Weaviate and get its ID
-            class_id = weaviate_client.data_object.create(
-                data_object=class_obj, class_name="Class"
-            )
+            class_id = class_collection.data.insert(properties=class_obj)
 
             # File -> Class relationship
-            weaviate_client.data_object.reference.add(
-                from_class_name="File",
+            file_collection.data.reference_add(
                 from_uuid=file_id,
-                from_property_name="hasClass",
-                to_class_name="Class",
-                to_uuid=class_id,
+                from_property="hasClass",
+                to=class_id,
             )
 
             for sub_node in node.body.body:
@@ -347,40 +359,32 @@ def parse_file(
                         }
                         # print(f"{function_obj=}")
                         # Create function in Weaviate and get its ID
-                        function_id = weaviate_client.data_object.create(
-                            data_object=function_obj, class_name="Function"
+                        function_id = function_collection.data.insert(
+                            properties=function_obj
                         )
                         # Class -> Function relationship
-                        weaviate_client.data_object.reference.add(
-                            from_class_name="Class",
+                        class_collection.data.reference_add(
                             from_uuid=class_id,
-                            from_property_name="hasFunction",
-                            to_class_name="Function",
-                            to_uuid=function_id,
+                            from_property="hasFunction",
+                            to=function_id,
                         )
                         # Function -> File relationship
-                        weaviate_client.data_object.reference.add(
-                            from_class_name="Function",
+                        function_collection.data.reference_add(
                             from_uuid=function_id,
-                            from_property_name="belongsToFile",
-                            to_class_name="File",
-                            to_uuid=file_id,
+                            from_property="belongsToFile",
+                            to=file_id,
                         )
                         # Function -> Class relationship
-                        weaviate_client.data_object.reference.add(
-                            from_class_name="Function",
+                        function_collection.data.reference_add(
                             from_uuid=function_id,
-                            from_property_name="belongsToClass",
-                            to_class_name="Class",
-                            to_uuid=class_id,
+                            from_property="belongsToClass",
+                            to=class_id,
                         )
                         # File -> Function relationship
-                        weaviate_client.data_object.reference.add(
-                            from_class_name="File",
+                        file_collection.data.reference_add(
                             from_uuid=file_id,
-                            from_property_name="hasFunction",
-                            to_class_name="Function",
-                            to_uuid=function_id,
+                            from_property="hasFunction",
+                            to=function_id,
                         )
                     except AttributeError as e:
                         logging.error(e)
@@ -388,21 +392,23 @@ def parse_file(
     return file_id
 
 
-def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.Client):
+def analyze_directory(
+    directory: str, repo_url: str, weaviate_client: weaviate.WeaviateClient
+):
     """
     Analyzes all Python files in a directory (and its subdirectories), collects a
     list of dictionaries containing filename, function names, and class names for each file.
     """
+    weaviate_client.connect()
     logging.info(f"Analyzing Code Directory {directory=}")
     # File entity
     directory_obj = {
         "name": directory,
         "link": repo_url,
     }
+    repository_collection = weaviate_client.collections.get("Repository")
     # Create file in Weaviate and get its id
-    directory_id = weaviate_client.data_object.create(
-        data_object=directory_obj, class_name="Repository"
-    )
+    directory_id = repository_collection.data.insert(properties=directory_obj)
     logging.info(
         f"created directory object in weaviate db {directory_obj=} with {directory_id=}"
     )
@@ -427,12 +433,10 @@ def analyze_directory(directory: str, repo_url: str, weaviate_client: weaviate.C
                         f"File analysis complete. Analyzed file {file_id=}---------"
                     )
                     # Repository -> File relationship
-                    weaviate_client.data_object.reference.add(
-                        from_class_name="Repository",
+                    repository_collection.data.reference_add(
                         from_uuid=directory_id,
-                        from_property_name="hasFile",
-                        to_class_name="File",
-                        to_uuid=file_id,
+                        from_property="hasFile",
+                        to=file_id,
                     )
 
     return directory_id
@@ -470,34 +474,9 @@ def clone_repo_if_not_exists(repo_url: str, local_dir: Union[str, os.PathLike]) 
         logging.info(f"Repository has already been cloned to {local_dir}")
 
 
-# Function that queries Weaviate db to find if repo has been processed there.
-# takes repo_dir and client and finds out if it can find data for the repo_dir.
-def check_if_repo_has_been_embedded(repo_dir: str, client: weaviate.Client) -> bool:
-    # query if library already exists and has documentation files
-    result = (
-        client.query.get(
-            "Repository",
-            properties=["name"],
-        )
-        .with_where(
-            {
-                "path": ["name"],
-                "operator": "Equal",
-                "valueText": repo_dir,
-            }
-        )
-        .do()
-    )
-    library_exists = result["data"]["Get"]["Repository"]
-    if len(library_exists) == 0:
-        return False
-    else:
-        return True
-
-
 # check if library has been embedded to weaviate, otherwise embed it using analyze_directory
 def embed_repository_if_not_exists(
-    repo_dir: str, repo_url: str, client: weaviate.Client
+    repo_dir: str, repo_url: str, client: weaviate.WeaviateClient
 ) -> None:
     if not check_if_repo_has_been_embedded(repo_dir, client):
         logging.info(f"Found no embedding for library {repo_dir=}, embedding now...")
@@ -514,7 +493,7 @@ def embed_repository_if_not_exists(
 
 
 def run_codebase_analysis(
-    repo_dir: str, libname: str, repo_url: str, client: weaviate.Client
+    repo_dir: str, libname: str, repo_url: str, client: weaviate.WeaviateClient
 ) -> None:
     logging.info(f"Running analysis for {libname=}")
     repo_dir = repo_dir + "/" + libname

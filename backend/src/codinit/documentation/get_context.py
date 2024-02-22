@@ -4,8 +4,8 @@ import re
 from typing import List, Optional
 
 import weaviate
+import weaviate.classes as wvc
 from apify_client import ApifyClient
-from langchain.retrievers.weaviate_hybrid_search import WeaviateHybridSearchRetriever
 
 from codinit.config import (
     DocumentationSettings,
@@ -14,7 +14,7 @@ from codinit.config import (
     secrets,
 )
 from codinit.documentation.chunk_documents import chunk_document
-from codinit.documentation.doc_schema import documentation_file_class, library_class
+from codinit.documentation.doc_schema import init_library_schema_weaviate
 from codinit.documentation.pydantic_models import Library, WebScrapingData
 from codinit.documentation.save_document import load_scraped_data_from_json
 from codinit.weaviate_client import get_weaviate_client
@@ -29,63 +29,44 @@ class BaseWeaviateDocClient:
     Base class for weaviate Documentation client.
     """
 
-    def __init__(self, library: Library, client: weaviate.Client) -> None:
+    def __init__(self, library: Library, client: weaviate.WeaviateClient) -> None:
         self.library = library
         self.client = client
         self.init_schema()
 
     def check_library_exists(self):
+        self.client.connect()
         # query if library already exists and has documentation files
-        result = (
-            self.client.query.get(
-                "Library",
-                properties=["name"],
-            )
-            .with_where(
-                {
-                    "path": ["name"],
-                    "operator": "Equal",
-                    "valueText": self.library.libname,
-                }
-            )
-            .do()
+        library = self.client.collections.get("Library")
+        query_library_result = library.query.fetch_objects(
+            filters=wvc.query.Filter.by_property("name").equal(self.library.libname),
+            limit=1,
         )
-        library_exists = result["data"]["Get"]["Library"]
-        if len(library_exists) == 0:
+        self.client.close()
+        print(f"{query_library_result=}")
+        if len(query_library_result.objects) == 0:
             return False
         else:
             return True
 
     def get_lib_id(self) -> Optional[str]:
         object_id = None
-        result = (
-            self.client.query.get(
-                "Library",
-                properties=["name"],
-            )
-            .with_where(
-                {
-                    "path": ["name"],
-                    "operator": "Equal",
-                    "valueText": self.library.libname,
-                }
-            )
-            .with_additional(properties=["id"])
-            .do()
+        self.client.connect()
+        # query if library already exists and has documentation files
+        library = self.client.collections.get("Library")
+        result = library.query.fetch_objects(
+            filters=wvc.query.Filter.by_property("name").equal(self.library.libname),
+            limit=1,
         )
+        self.client.close()
+        print(result)
         # get the id of a library from weaviate
-        if (
-            "data" in result
-            and "Get" in result["data"]
-            and "Library" in result["data"]["Get"]
-            and len(result["data"]["Get"]["Library"])
-            > 0  # case where library exists at least once
-        ):
-            if len(result["data"]["Get"]["Library"]) > 1:
+        if len(result.objects) > 0:  # case where library exists at least once
+            if len(result.objects) > 1:
                 logging.warning(
                     f"More than one library with name {self.library.libname} found, returning first one."
                 )
-            object_id = result["data"]["Get"]["Library"][0]["_additional"]["id"]
+            object_id = result.objects[0].uuid
         else:  # case where result is {'data': {'Get': {'Library': []}}}
             logging.warning(f"Library ID for {self.library.libname} not found.")
         return object_id
@@ -93,17 +74,18 @@ class BaseWeaviateDocClient:
     def check_library_has_docs(self, lib_id: str) -> int:
         """returns number of documents associated with one library in the database"""
         num_docs = 0
-        result = (
-            self.client.query.get(
-                "Library",
-                properties=[
-                    "name",
-                    "hasDocumentationFile {... on DocumentationFile {title}}",
-                ],
-            )
-            .with_where({"path": ["id"], "operator": "Equal", "valueString": lib_id})
-            .do()
+        self.client.connect()
+        collection = self.client.collections.get("Library")
+        result = collection.query.fetch_objects(
+            filters=wvc.query.Filter.by_id().equal(lib_id),
+            return_properties=["name"],
+            return_references=[
+                wvc.query.QueryReference(
+                    link_on="hasDocumentationFile", return_properties=["title"]
+                ),
+            ],
         )
+        self.client.close()
         logging.debug(
             f"Querying documentation for library with ID {lib_id} gives {result=}"
         )
@@ -114,12 +96,8 @@ class BaseWeaviateDocClient:
         2. example, multiple docs exist: result = {'data': {'Get': {'Library': [{'hasDocumentationFile': [{'title': 'title1'}, {'title': 'title2'}], 'name': 'langchain'}]}}}
         """
         # Check if there are associated documentation files
-        if (
-            "data" in result
-            and "Get" in result["data"]
-            and "Library" in result["data"]["Get"]
-        ):
-            library_data = result["data"]["Get"]["Library"]
+        if result.objects:
+            library_data = result.objects[0]
             logging.debug(
                 f"library with ID {lib_id} has documentation files: {library_data=}"
             )
@@ -127,14 +105,10 @@ class BaseWeaviateDocClient:
             1. example, no docs exist: library_data = [{'hasDocumentationFile': None, 'name': 'langchain'}]
             2. example, multiple docs exist: library_data = [{'hasDocumentationFile': [{'title': 'title1'}, {'title': 'title2'}], 'name': 'langchain'}]
             """
-            if (
-                library_data
-                and library_data[0]
-                and ("hasDocumentationFile" in library_data[0])
-            ):
-                documentation_files = library_data[0]["hasDocumentationFile"]
+            if library_data.references:
+                documentation_files = library_data.references["hasDocumentationFile"]
                 if documentation_files:
-                    num_docs = len(documentation_files)
+                    num_docs = len(documentation_files.objects)
                 else:
                     logging.warning(
                         f"Library with ID {lib_id} has no documentation files."
@@ -145,20 +119,7 @@ class BaseWeaviateDocClient:
 
     # TODO create test for this class
     def init_schema(self):
-        existing_schema = self.client.schema.get()
-        existing_classes = {cls["class"] for cls in existing_schema.get("classes", [])}
-
-        required_classes = {library_class["class"], documentation_file_class["class"]}
-
-        # Check if all required classes already exist
-        if not required_classes.issubset(existing_classes):
-            # Create schema with both classes
-            self.client.schema.create(
-                {"classes": [library_class, documentation_file_class]}
-            )
-            logging.info(
-                f"Created schema with classes {library_class['class']} and {documentation_file_class['class']}"
-            )
+        init_library_schema_weaviate(client=self.client)
 
 
 # refactor the following document to put all functions under one class
@@ -170,7 +131,7 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
     def __init__(
         self,
         library: Library,
-        client: weaviate.Client,
+        client: weaviate.WeaviateClient,
         documentation_settings: DocumentationSettings = documentation_settings,
         secrets: Secrets = secrets,
     ):
@@ -212,44 +173,45 @@ class WeaviateDocLoader(BaseWeaviateDocClient):
 
     # save document to weaviate
     def save_doc_to_weaviate(self, doc_obj: dict, lib_id: str) -> str:
+        self.client.connect()
+        documentation_collection = self.client.collections.get("DocumentationFile")
+        library_collection = self.client.collections.get("Library")
+        doc_id = documentation_collection.data.insert(properties=doc_obj)
         # TODO create hash of an object and query against object hash in library. If not found then save object.
-        doc_id = self.client.data_object.create(
-            data_object=doc_obj, class_name="DocumentationFile"
-        )
+
         # DocumentationFile -> Library relationship
-        self.client.data_object.reference.add(
-            from_class_name="DocumentationFile",
+        documentation_collection.data.reference_add(
             from_uuid=doc_id,
-            from_property_name="fromLibrary",
-            to_class_name="Library",
-            to_uuid=lib_id,
+            from_property="fromLibrary",
+            to=lib_id,
         )
 
         # Library -> DocumentationFile relationship
-        self.client.data_object.reference.add(
-            from_class_name="Library",
+        library_collection.data.reference_add(
             from_uuid=lib_id,
-            from_property_name="hasDocumentationFile",
-            to_class_name="DocumentationFile",
-            to_uuid=doc_id,
+            from_property="hasDocumentationFile",
+            to=doc_id,
         )
         logging.info(
             f"Saved document with DOC_ID {doc_id=} to library with LIB_ID {lib_id=}"
         )
+        self.client.close()
         return doc_id
 
     # save library to weaviate
-
     def save_lib_to_weaviate(self):
+        self.client.connect()
+
         # create library object
         lib_obj = {
             "name": self.library.libname,
             "links": self.library.links,
             "description": self.library.lib_desc,
         }
-        lib_id = self.client.data_object.create(
-            data_object=lib_obj, class_name="Library"
-        )
+        library_collection = self.client.collections.get("Library")
+        # save library object to weaviate
+        lib_id = library_collection.data.insert(properties=lib_obj)
+        self.client.close()
         logging.info(
             f"Saved library object {lib_id=} to weaviate,library has LIB_ID {lib_id=}"
         )
@@ -331,25 +293,27 @@ class WeaviateDocQuerier(BaseWeaviateDocClient):
     def __init__(
         self,
         library: Library,
-        client: weaviate.Client,
+        client: weaviate.WeaviateClient,
         documentation_settings: DocumentationSettings = documentation_settings,
     ) -> None:
         super().__init__(library=library, client=client)
         self.documentation_settings = documentation_settings
         # create retriever
-        self.retriever = self.get_retriever()
+        self.client = self.client
 
     # get retriever
-    def get_retriever(self):
-        # create retriever
-        retriever = WeaviateHybridSearchRetriever(
-            client=self.client,
-            index_name="DocumentationFile",
-            text_key="content",
-            k=self.documentation_settings.top_k,
+    def query_weaviate_docs(self, query: str):
+        self.client.connect()
+        documentation_collection = self.client.collections.get("DocumentationFile")
+        response = documentation_collection.query.hybrid(
+            query=query,
             alpha=self.documentation_settings.alpha,
+            return_metadata=wvc.query.MetadataQuery(score=True, explain_score=True),
+            limit=self.documentation_settings.top_k,
         )
-        return retriever
+        docs = response.objects
+        self.client.close()
+        return docs
 
     # get relevant documents for a query
     def get_relevant_documents(self, query: str):
@@ -359,11 +323,11 @@ class WeaviateDocQuerier(BaseWeaviateDocClient):
         if len(result) > 0:
             query = result[0]
         logging.info(f"Retrieving relevant documents for query: {query}")
-        docs = self.retriever.get_relevant_documents(query=query)
+        docs = self.query_weaviate_docs(query=query)
         logging.info(f"{docs=}")
         relevant_docs = ""
         for doc in docs:
-            relevant_docs += doc.page_content
+            relevant_docs += doc.properties["content"]
         return relevant_docs
 
 
@@ -376,11 +340,15 @@ if __name__ == "__main__":
         # "https://python.langchain.com/docs/guides",
         # "https://python.langchain.com/docs/integrations",
     ]
+    library_repo_url = "https://github.com/langchain-ai/langchain.git"
+    library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
+
     client = get_weaviate_client()
-    library = Library(libname=libname, links=links)
+    # base_weaviate_doc_client = BaseWeaviateDocClient(library=library, client=client)
+    # base_weaviate_doc_client.run()
     weaviate_doc_loader = WeaviateDocLoader(library=library, client=client)
-    weaviate_doc_loader.run()
-    """
+    # weaviate_doc_loader.run()
+
     weaviate_doc_querier = WeaviateDocQuerier(
         library=library, client=weaviate_doc_loader.client
     )
@@ -388,7 +356,6 @@ if __name__ == "__main__":
         query="Using the langchain library, write code that illustrates usage of the library."
     )
     print(docs)
-    print(weaviate_doc_loader.get_lib_id())
-    num_docs = weaviate_doc_loader.check_library_has_docs(lib_id="some_id")
-    print(num_docs)
-    """
+    # print(weaviate_doc_loader.get_lib_id())
+    # num_docs = weaviate_doc_loader.check_library_has_docs(lib_id="some_id")
+    # print(num_docs)
