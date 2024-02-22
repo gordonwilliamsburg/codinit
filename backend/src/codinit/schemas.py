@@ -285,5 +285,9 @@ def init_code_kg_schema_weaviate(client: weaviate.WeaviateClient):
 if __name__ == "__main__":
     client = get_weaviate_client()
 
-    client.collections.delete_all()
+    client.collections.delete("Repository")
+    client.collections.delete("File")
+    client.collections.delete("Import")
+    client.collections.delete("Class")
+    client.collections.delete("Function")
     init_code_kg_schema_weaviate(client)
