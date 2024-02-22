@@ -25,7 +25,14 @@ def get_files(prompt: str, k: int = 1):
         limit=k,
     )
     client.close()
-    return result.objects
+    files = result.objects
+    query_result = "found the following files:"
+    for file in files:
+        query_result += f'file {file.properties["name"]}'
+        query_result += f'has imports: {file.references["hasImport"].objects}'
+        query_result += f'has classes: {file.references["hasClass"].objects}'
+        query_result += f'has functions: {file.references["hasFunction"].objects}'
+    return query_result
 
 
 def get_classes(prompt: str, k: int = 1):
@@ -46,7 +53,12 @@ def get_classes(prompt: str, k: int = 1):
         limit=k,
     )
     client.close()
-    return result.objects
+    classes = result.objects
+    query_result = "found the following classes:"
+    for class_ in classes:
+        query_result += f'{class_.properties["name"]}'
+        query_result += f'has functions: {class_.references["hasFunction"].objects}'
+    return query_result
 
 
 def get_imports(prompt: str, k: int = 1):
@@ -69,7 +81,14 @@ def get_imports(prompt: str, k: int = 1):
         limit=k,
     )
     client.close()
-    return result.objects
+    imports = result.objects
+    query_result = "found the following imports:"
+    for import_ in imports:
+        query_result += f'{import_.properties["name"]}'
+        query_result += (
+            f'belongs to file: {import_.references["belongsToFile"].objects}'
+        )
+    return query_result
 
 
 def get_functions(prompt: str, k: int = 1):
@@ -95,6 +114,16 @@ def get_functions(prompt: str, k: int = 1):
         limit=k,
     )
     client.close()
+    functions = result.objects
+    query_result = "found the following functions:"
+    for function in functions:
+        query_result += f'{function.properties["name"]}'
+        query_result += (
+            f'belongs to file: {function.references["belongsToFile"].objects}'
+        )
+        query_result += (
+            f'belongs to class: {function.references["belongsToClass"].objects}'
+        )
     return result.objects
 
 
@@ -105,7 +134,7 @@ def get_exact_imports(query: str, k: int = 1):
     import_collection = client.collections.get("Import")
     result = import_collection.query.bm25(query=query, properties=["name"], limit=k)
     client.close()
-    return result["data"]["Get"]["Import"]
+    return result.objects
 
 
 def get_imports_from_kg(import_list: List[str], library_name: str, k=10):
