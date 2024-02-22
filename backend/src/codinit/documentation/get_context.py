@@ -58,7 +58,7 @@ class BaseWeaviateDocClient:
             filters=wvc.query.Filter.by_property("name").equal(self.library.libname),
             limit=1,
         )
-        client.close()
+        self.client.close()
         print(result)
         # get the id of a library from weaviate
         if len(result.objects) > 0:  # case where library exists at least once
@@ -85,7 +85,7 @@ class BaseWeaviateDocClient:
                 ),
             ],
         )
-        client.close()
+        self.client.close()
         logging.debug(
             f"Querying documentation for library with ID {lib_id} gives {result=}"
         )
@@ -108,7 +108,7 @@ class BaseWeaviateDocClient:
             if library_data.references:
                 documentation_files = library_data.references["hasDocumentationFile"]
                 if documentation_files:
-                    num_docs = len(documentation_files)
+                    num_docs = len(documentation_files.objects)
                 else:
                     logging.warning(
                         f"Library with ID {lib_id} has no documentation files."
