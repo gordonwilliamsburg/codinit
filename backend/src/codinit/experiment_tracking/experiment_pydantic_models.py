@@ -57,7 +57,7 @@ class SelfHealingBlock(BaseModel):
     time: float
     Generation_ID: int
     Self_Healing_Attempt: int
-    Linting_Loop: LintingAttempt
+    Linting_Loop: List[LintingAttempt]
     Correction_Loop: CorrectionLoop
     Metric: int
 
@@ -149,7 +149,7 @@ if __name__ == "__main__":
         time=2.5,
         Generation_ID=101,
         Self_Healing_Attempt=1,
-        Linting_Loop=linting_attempt,
+        Linting_Loop=[linting_attempt],
         Correction_Loop=correction_loop,
         Metric=3,
     )
