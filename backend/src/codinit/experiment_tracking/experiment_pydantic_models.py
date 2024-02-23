@@ -176,7 +176,7 @@ if __name__ == "__main__":
 
     # Serialize to JSON
     print(run.model_dump_json(indent=4))
-    write_to_json(file_path="dummy_run.json", data=run)
+    write_to_json(file_path="data/dummy_run.json", data=run)
 
     # Deserialize from JSON
-    run_from_json = read_from_json(file_path="dummy_run.json")
+    run_from_json = read_from_json(file_path="data/dummy_run.json")

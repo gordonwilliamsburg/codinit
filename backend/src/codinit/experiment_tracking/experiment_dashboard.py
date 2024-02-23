@@ -13,7 +13,7 @@ from codinit.experiment_tracking.json_experiment_rw import read_from_json
 # Set the page layout to wide
 st.set_page_config(layout="wide")
 # Load your data
-run = read_from_json("dummy_run.json")  # Replace with your JSON file path
+run = read_from_json("data/dummy_run.json")  # Replace with your JSON file path
 
 
 def display_initial_code(initial_code: InitialCode):
