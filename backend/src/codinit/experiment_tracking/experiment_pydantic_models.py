@@ -9,14 +9,14 @@ class TaskExecutionConfig(BaseModel):
     install_dependencies: bool = True
     check_package_is_in_pypi: bool = True
     log_to_stdout: bool = True
-    coding_attempts: int = 1
+    coding_attempts: int = 4
     max_coding_attempts: int = 5
     dependency_install_attempts: int = 5
     planner_temperature: float = 0
     coder_temperature: float = 0.0
     code_corrector_temperature: float = 0
     dependency_tracker_temperature: float = 0
-    lint_correction_threshold: int = 3
+    lint_correction_threshold: int = 0
 
 
 class DocumentationScraping(BaseModel):

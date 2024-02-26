@@ -115,7 +115,7 @@ End Of Code.
 
 Example 2:
 Objective: Create a langchain agent based on openai's 'gpt-3.5-turbo' using ChatOpenAI.
-Plan: 1. Initialize the agent with the ChatOpenAI llm model 'gpt-3.5-turbo'.
+Plan: 1. Initialize the agent with the ChatOpenAI llm model 'gpt-3.5-turbo'. 2. Define an LLM Chain using LLMChain which takes the ChatOpenAI model and a prompt an argument.
 Context:
 LLMChain is perhaps one of the most popular ways of querying an LLM object. It formats the prompt template using the input key values provided (and also memory key values, if available), passes the formatted string to LLM and returns the LLM output. Below we show additional functionalities of LLMChain class.
 from langchain import PromptTemplate, OpenAI, LLMChain
@@ -211,7 +211,7 @@ Make sure to return response in json format.
 """
 planner_user_prompt_template = """
 Task: '{task}'.
-Context: {context}.
+Documentation: {context}.
 """
 dependency_tracker_system_prompt = """
 You're an AI master at understanding code.
@@ -228,19 +228,43 @@ Plan: '{plan}'
 coder_system_prompt = """"You're an expert python programmer AI Agent. You solve problems by using Python code.
 You will be provided with documentation for the libraries you will need to use.
 This contextual documentation will show you how to use the library. Make sure to rely on it to generate your python code.
+Here's an example:
+Task: Create a langchain agent based on openai's 'gpt-3.5-turbo' using ChatOpenAI.
+Plan: 1. Initialize the agent with the ChatOpenAI llm model 'gpt-3.5-turbo'. 2. Define an LLM Chain using LLMChain which takes the ChatOpenAI model and a prompt an argument.
+Context:
+LLMChain is perhaps one of the most popular ways of querying an LLM object. It formats the prompt template using the input key values provided (and also memory key values, if available), passes the formatted string to LLM and returns the LLM output. Below we show additional functionalities of LLMChain class.
+from langchain import PromptTemplate, OpenAI, LLMChain
 
-Please pay attention to your module imports. Only import modules and functions as they appear in the documentation.
+prompt_template = "What is a good name for a company that makes product?"
 
-Keep things simple. Define each code functionality separately. DO NOT NEST CODE!!!!
+llm = OpenAI(temperature=0)
+llm_chain = LLMChain(
+    llm=llm,
+    prompt=PromptTemplate.from_template(prompt_template)
+)
+llm_chain("colorful socks")
 
-You should ALWAYS output the full code.
+Thought: I need to import the ChatOpenAI class from the langchain library in order to initialize an llm model. I also need to import the PromptTemplate and LLMChain classes from the langchain library in
+order to define a prompt template and an llm chain. I will finally initialize an llm chain using the llm and prompt arguments.
+This llm chain will be used to query the llm model using the given prompt.
+
+Code:
+from langchain.chat_models import ChatOpenAI
+from langchain import PromptTemplate, LLMChain
+prompt_template = "What is a good name for a company that makes product?"
+prompt=PromptTemplate.from_template(prompt_template)
+# Initialize agent with ChatOpenAI llm model 'gpt-3.5-turbo'
+llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.5, max_tokens=1024)
+llm_chain =LLMChain(llm=llm, prompt=prompt)
+
+Make sure to write the complete code that fulfills the task!
 Now please help with the subtask below.
 Make sure to call the "execute_code" function to run your code!!
 Do not install any dependencies! all dependencies have been installed already.
 Make sure to return response in json format.
 """
 coder_user_prompt_template = """
-Context: {context}
+Documentation: {context}
 Task: {task}
 Plan: {plan}
 """
@@ -275,7 +299,7 @@ Do not install any dependencies! all dependencies have been installed already.
 Make sure to return response in json format.
 """
 code_corrector_user_prompt_template = """
-Context: {context}
+Documentation: {context}
 Task: {task}
 Source Code: {source_code}
 Error: {error}

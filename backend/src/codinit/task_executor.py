@@ -114,7 +114,7 @@ class TaskExecutor:
 
         if dependencies:
             dependencies = list(set(dependencies))
-            dependencies += ["langchain", "pydantic", "openai", "wikipedia"]
+            # dependencies += ["langchain", "pydantic", "openai", "wikipedia"]
             logger.info(f"{dependencies=}")
 
             for dependency in dependencies:
@@ -190,7 +190,7 @@ class TaskExecutor:
     def initial_code_generation(
         self, library: Library, client: weaviate.WeaviateClient
     ) -> InitialCode:
-        chat_history = []
+        # chat_history = []
         # Generating a coding plan
         time_stamp = datetime.now()
         relevant_docs = self.get_docs(library=library, task=self.task, client=client)
@@ -208,15 +208,15 @@ class TaskExecutor:
                 tool_choice="install_dependencies", chat_history=[], plan=plan
             )[0]
             self.install_dependencies(deps)
-        chat_history.append(
-            {"role": "assistant", "content": f"installed dependencies {deps}"}
-        )
+        # chat_history.append(
+        #     {"role": "assistant", "content": f"installed dependencies {deps}"}
+        # )
         # generate code
         # TODO grab thought from code execution function
         new_code = self.coder.execute(
             task=self.task,
             tool_choice="execute_code",
-            chat_history=chat_history,
+            chat_history=[],
             plan=plan,
             context=relevant_docs,
         )[0]
