@@ -11,7 +11,7 @@ from codinit.experiment_tracking.experiment_pydantic_models import (
     Task,
     TaskExecutionConfig,
 )
-from codinit.experiment_tracking.json_experiment_rw import read_from_json, write_to_json
+from codinit.experiment_tracking.json_experiment_rw import write_to_json
 
 
 class ExperimentLogger:
@@ -92,4 +92,4 @@ class ExperimentLogger:
         file_name = (
             f"task_{self.task.Task_ID}_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
         )
-        write_to_json(self.run, f"{save_dir}/{file_name}")
+        write_to_json(data=self.run, file_path=f"{save_dir}/{file_name}")

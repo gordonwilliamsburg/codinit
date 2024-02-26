@@ -49,7 +49,7 @@ class LintingAttempt(BaseModel):
     Timestamp: datetime
     lint_attempt: int
     Code: Optional[str] = None
-    Lint_Query_Result: Optional[str] = None
+    Lint_Query_Result: Optional[List[str]] = None
     Lint_Response: Optional[str] = None
     Generated_Code: Optional[CodeGeneration] = None
     Lint_Result: List[str]
@@ -132,7 +132,7 @@ if __name__ == "__main__":
         Timestamp=datetime.now(),
         lint_attempt=1,
         Code="print('Hello, World!')",
-        Lint_Query_Result="Query result",
+        Lint_Query_Result=["Query result"],
         Lint_Response="Response",
         Generated_Code=CodeGeneration(
             Thought="Correcting based on linting",
