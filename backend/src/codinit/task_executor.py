@@ -460,4 +460,12 @@ class TaskExecutor:
             time_stamp=time_stamp,
             task_execution_config=self.config,
         )
+
+        self.experiment_logger.log_task_to_run(
+            time_stamp=time_stamp,
+            run_id=self.run_id,
+            git_sha=self.sha,
+            commit_message=self.message,
+        )
+        self.experiment_logger.save_to_json()
         return new_code

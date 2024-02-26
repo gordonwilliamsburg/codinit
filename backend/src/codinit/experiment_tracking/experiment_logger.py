@@ -1,16 +1,17 @@
 import json
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 
 from codinit.experiment_tracking.experiment_pydantic_models import (
     CorrectionLoop,
-    DocumentationScraping,
     InitialCode,
     LintingAttempt,
+    Run,
     SelfHealingBlock,
     Task,
     TaskExecutionConfig,
 )
+from codinit.experiment_tracking.json_experiment_rw import read_from_json, write_to_json
 
 
 class ExperimentLogger:
@@ -78,8 +79,24 @@ class ExperimentLogger:
             ),
         )
 
-    # def save_to_json(self):
-    #     task = self.compile_task()
-    #     file_name = f"task_{self.task_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
-    #     with open(file_name, 'w') as file:
-    #         json.dump(task.dict(), file, indent=4)
+    def log_task_to_run(
+        self,
+        time_stamp: datetime,
+        run_id: int,
+        git_sha: Tuple[str],
+        commit_message: Tuple[str],
+    ):
+        self.run = Run(
+            Timestamp=time_stamp,
+            Run_ID=run_id,
+            Git_SHA=git_sha,
+            Tasks=[self.task],
+            Commit_Message=commit_message,
+        )
+
+    def save_to_json(self):
+        save_dir = f"data/experiment_logs/Run_{self.run.Run_ID}"
+        file_name = (
+            f"task_{self.task.Task_ID}_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
+        )
+        write_to_json(self.run, f"{save_dir}/{file_name}")

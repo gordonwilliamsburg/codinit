@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -85,9 +85,9 @@ class Task(BaseModel):
 
 class Run(BaseModel):
     Timestamp: datetime
-    Run_ID: str
-    Git_SHA: str
-    Commit_Message: str
+    Run_ID: int
+    Git_SHA: Tuple[str]
+    Commit_Message: Tuple[str]
     Tasks: List[Task]
 
 
@@ -177,9 +177,9 @@ if __name__ == "__main__":
     # Run instance
     run = Run(
         Timestamp=datetime.now(),
-        Run_ID="123456789",
-        Git_SHA="abcdef12345",
-        Commit_Message="Implemented feature X",
+        Run_ID=123456789,
+        Git_SHA=("abcdef12345",),
+        Commit_Message=("Implemented feature X",),
         Tasks=[task],
     )
 
