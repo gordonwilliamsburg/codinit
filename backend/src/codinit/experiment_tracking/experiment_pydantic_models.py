@@ -189,3 +189,9 @@ if __name__ == "__main__":
 
     # Deserialize from JSON
     run_from_json = read_from_json(file_path="data/dummy_run.json")
+
+    save_dir = f"data/experiment_logs/Run_{run.Run_ID}"
+    file_name = (
+        f"task_{run.Tasks[0].Task_ID}_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
+    )
+    write_to_json(data=run, file_path=f"{save_dir}/{file_name}")

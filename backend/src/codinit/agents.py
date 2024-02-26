@@ -69,7 +69,7 @@ class OpenAIAgent:
         """
         function_name = tool_call.function.name
         if function_name not in self.func_names:
-            return print(f"Not allowed: {tool_call.name}")
+            return print(f"Not allowed: {function_name}")
         function_args = json.loads(tool_call.function.arguments)
         function_response = globals()[function_name](**function_args)
         return function_response

@@ -10,7 +10,7 @@ logging.basicConfig(
 )
 
 
-def get_files(prompt: str, k: int = 1):
+def get_files(prompt: str, k: int = 1) -> str:
     """Returns code file relevant for a given prompt
     Args:
         prompt: str, description of the file to search for.
@@ -34,7 +34,7 @@ def get_files(prompt: str, k: int = 1):
     logging.info(f"file objects query {files=}")
     query_result = "found the following files: "
     for file in files:
-        query_result += f'file {file.properties["name"]}, '
+        query_result += f'\n file {file.properties["name"]}, '
         try:
             query_result += f'has imports: {[object.properties["name"] for object in file.references["hasImport"].objects]}, '
         except KeyError:
@@ -47,11 +47,11 @@ def get_files(prompt: str, k: int = 1):
             query_result += f'has functions named: {[object.properties["name"] for object in file.references["hasFunction"].objects]}'
         except KeyError:
             pass
-    logging.debug(f"query_result {query_result=}")
+    logging.debug(f"files query_result {query_result=}")
     return query_result
 
 
-def get_classes(prompt: str, k: int = 1):
+def get_classes(prompt: str, k: int = 1) -> str:
     """Returns code classes relevant for a given prompt
     Args:
         prompt: str, description of the class to search for.
@@ -73,15 +73,16 @@ def get_classes(prompt: str, k: int = 1):
     logging.info(f"class objects query{classes=}")
     query_result = "found the following classes: "
     for class_ in classes:
-        query_result += f'class with name: {class_.properties["name"]} '
+        query_result += f'\n class with name: {class_.properties["name"]} '
         try:
             query_result += f'has functions: {[object.properties["name"] for object in class_.references["hasFunction"].objects]}'
         except KeyError:
             pass
+    logging.debug(f"classes query_result {query_result=}")
     return query_result
 
 
-def get_imports(prompt: str, k: int = 1):
+def get_imports(prompt: str, k: int = 1) -> str:
     """Returns code imports relevant for a given prompt
     Args:
         prompt: str, description of the import to search for.
@@ -105,15 +106,16 @@ def get_imports(prompt: str, k: int = 1):
     logging.info(f"import bjects query{imports=}")
     query_result = "found the following imports:"
     for import_ in imports:
-        query_result += f'import name: {import_.properties["name"]} '
+        query_result += f'\n import name: {import_.properties["name"]} '
         try:
             query_result += f'belongs to file: {[object.properties["name"] for object in import_.references["belongsToFile"].objects]}'
         except KeyError:
             pass
+    logging.debug(f"imports query_result {query_result=}")
     return query_result
 
 
-def get_functions(prompt: str, k: int = 1):
+def get_functions(prompt: str, k: int = 1) -> str:
     """Returns code functions relevant for a given prompt
     Args:
         prompt: str, description of the function to search for.
@@ -140,7 +142,7 @@ def get_functions(prompt: str, k: int = 1):
     logging.info(f"function objects query{functions=}")
     query_result = "found the following functions: "
     for function in functions:
-        query_result += f'function named: {function.properties["name"]} '
+        query_result += f'\n function named: {function.properties["name"]} '
         try:
             query_result += f'belongs to file: {[object.properties["name"] for object in function.references["belongsToFile"].objects]}'
         except KeyError:
@@ -149,10 +151,11 @@ def get_functions(prompt: str, k: int = 1):
             query_result += f'belongs to class: {[object.properties["name"] for object in function.references["belongsToClass"].objects]}'
         except KeyError:
             pass
-    return result.objects
+    logging.debug(f"functions query_result {query_result=}")
+    return query_result
 
 
-def get_exact_imports(query: str, k: int = 1):
+def get_exact_imports(query: str, k: int = 1) -> str:
     """Returns exact imports relevant for a given prompt"""
     client = get_weaviate_client()
     client.connect()
@@ -173,7 +176,7 @@ def get_imports_from_kg(import_list: List[str], library_name: str, k=10):
 
 
 if __name__ == "__main__":
-    get_classes("Agent")
-    get_imports("Agent")
-    get_functions("execute")
-    get_files("agent.py")
+    # get_classes("Agent")
+    # get_imports("Agent")
+    get_functions("execute", k=4)
+    # get_files("agent.py")

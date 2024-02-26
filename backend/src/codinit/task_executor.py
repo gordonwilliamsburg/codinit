@@ -315,7 +315,7 @@ class TaskExecutor:
                     messages=self.linter.messages,
                 )
                 .choices[0]
-                .message
+                .message.content
             )
             logging.info(f"{lint_response=}")
             # TODO extract thought from code execution function
