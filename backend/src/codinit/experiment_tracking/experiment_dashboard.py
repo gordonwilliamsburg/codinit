@@ -13,7 +13,9 @@ from codinit.experiment_tracking.json_experiment_rw import read_from_json
 # Set the page layout to wide
 st.set_page_config(layout="wide")
 # Load your data
-run = read_from_json("data/dummy_run.json")  # Replace with your JSON file path
+run = read_from_json(
+    "data/experiment_logs/Run_18/task_1_20240226160624.json"
+)  # Replace with your JSON file path
 
 
 def display_initial_code(initial_code: InitialCode):
@@ -27,12 +29,13 @@ def display_initial_code(initial_code: InitialCode):
         st.write(
             "Number of Tokens in Docs:", initial_code.Documentation_Scraping.num_tokens
         )
-        st.markdown(f"> {initial_code.Documentation_Scraping.Relevant_Docs}")
+        st.text(f"> {initial_code.Documentation_Scraping.Relevant_Docs}")
 
     # Display Generated Plan
     with st.container():
         st.markdown("#### Generated Plan")
-        st.markdown(f"> {', '.join(initial_code.Generated_Plan.Plan)}")
+        plan = "\n".join([f"{step}" for step in initial_code.Generated_Plan.Plan])
+        st.markdown(plan)
 
     # Display Dependencies in a Python code block
     with st.container():
@@ -62,9 +65,6 @@ def display_linting_attempt(linting_attempt: LintingAttempt):
     if linting_attempt.Code:
         st.markdown("#### Given Code")
         st.code(linting_attempt.Code, language="python")
-    with st.container():
-        st.markdown("#### Lint Result")
-        st.code(linting_attempt.Lint_Result, language="bash")
     if linting_attempt.Lint_Query_Result:
         st.markdown("#### Lint Query Result from CodeBaseKG")
         st.text_area("", linting_attempt.Lint_Query_Result)
@@ -84,6 +84,10 @@ def display_linting_attempt(linting_attempt: LintingAttempt):
         with st.container():
             st.markdown("#### Generated Code")
             st.code(linting_attempt.Generated_Code.Generated_Code, language="python")
+
+    with st.container():
+        st.markdown("#### Lint Result")
+        st.code(linting_attempt.Lint_Result, language="bash")
 
 
 def display_correction_loop(correction_loop: CorrectionLoop):
