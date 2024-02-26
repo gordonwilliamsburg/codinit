@@ -5,7 +5,8 @@ from typing import Tuple
 from codinit.code_editor import PythonCodeEditor
 from codinit.config import eval_settings
 from codinit.documentation.pydantic_models import Library
-from codinit.task_executor import TaskExecutionConfig, TaskExecutor
+from codinit.experiment_tracking.experiment_pydantic_models import TaskExecutionConfig
+from codinit.task_executor import TaskExecutor
 
 TASKS = [
     "using langchain library, write code that answers a question over a given text.",

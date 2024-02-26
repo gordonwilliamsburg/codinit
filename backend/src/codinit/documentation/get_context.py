@@ -316,7 +316,7 @@ class WeaviateDocQuerier(BaseWeaviateDocClient):
         return docs
 
     # get relevant documents for a query
-    def get_relevant_documents(self, query: str):
+    def get_relevant_documents(self, query: str) -> str:
         # clean up query that might be produced by an LLM
         query = query.replace("`", "").replace("'", "").replace('"', "")
         result = re.findall(r'"(.*?)"', query)

@@ -3,11 +3,24 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from codinit.task_executor import TaskExecutionConfig
+
+class TaskExecutionConfig(BaseModel):
+    execute_code: bool = True
+    install_dependencies: bool = True
+    check_package_is_in_pypi: bool = True
+    log_to_stdout: bool = True
+    coding_attempts: int = 1
+    max_coding_attempts: int = 5
+    dependency_install_attempts: int = 5
+    planner_temperature: float = 0
+    coder_temperature: float = 0.0
+    code_corrector_temperature: float = 0
+    dependency_tracker_temperature: float = 0
+    lint_correction_threshold: int = 3
 
 
 class DocumentationScraping(BaseModel):
-    Relevant_Docs: List[str]
+    Relevant_Docs: str
     num_tokens: int
 
 
@@ -106,7 +119,7 @@ if __name__ == "__main__":
     initial_code = InitialCode(
         Timestamp=datetime.now(),
         Documentation_Scraping=DocumentationScraping(
-            Relevant_Docs=["Doc1", "Doc2"], num_tokens=500
+            Relevant_Docs="Doc1", num_tokens=500
         ),
         Generated_Plan=GeneratedPlan(Plan=["Step 1", "Step 2"]),
         Dependencies=Dependencies(Dependencies=["lib1", "lib2"]),
