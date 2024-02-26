@@ -1,13 +1,26 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from pydantic import BaseModel
 
-from codinit.task_executor import TaskExecutionConfig
+
+class TaskExecutionConfig(BaseModel):
+    execute_code: bool = True
+    install_dependencies: bool = True
+    check_package_is_in_pypi: bool = True
+    log_to_stdout: bool = True
+    coding_attempts: int = 1
+    max_coding_attempts: int = 5
+    dependency_install_attempts: int = 5
+    planner_temperature: float = 0
+    coder_temperature: float = 0.0
+    code_corrector_temperature: float = 0
+    dependency_tracker_temperature: float = 0
+    lint_correction_threshold: int = 3
 
 
 class DocumentationScraping(BaseModel):
-    Relevant_Docs: List[str]
+    Relevant_Docs: str
     num_tokens: int
 
 
@@ -45,7 +58,6 @@ class LintingAttempt(BaseModel):
 
 class CorrectionLoop(BaseModel):
     Timestamp: datetime
-    code_correction_attempt: int
     Error1: str
     Generated_Code: CodeGeneration
     Lint_Result: List[str]
@@ -56,7 +68,6 @@ class CorrectionLoop(BaseModel):
 class SelfHealingBlock(BaseModel):
     time: float
     Generation_ID: int
-    Self_Healing_Attempt: int
     Linting_Loop: List[LintingAttempt]
     Correction_Loop: CorrectionLoop
     Metric: int
@@ -74,9 +85,9 @@ class Task(BaseModel):
 
 class Run(BaseModel):
     Timestamp: datetime
-    Run_ID: str
-    Git_SHA: str
-    Commit_Message: str
+    Run_ID: int
+    Git_SHA: Tuple[str]
+    Commit_Message: Tuple[str]
     Tasks: List[Task]
 
 
@@ -106,7 +117,7 @@ if __name__ == "__main__":
     initial_code = InitialCode(
         Timestamp=datetime.now(),
         Documentation_Scraping=DocumentationScraping(
-            Relevant_Docs=["Doc1", "Doc2"], num_tokens=500
+            Relevant_Docs="Doc1", num_tokens=500
         ),
         Generated_Plan=GeneratedPlan(Plan=["Step 1", "Step 2"]),
         Dependencies=Dependencies(Dependencies=["lib1", "lib2"]),
@@ -134,7 +145,6 @@ if __name__ == "__main__":
     # CorrectionLoop instance
     correction_loop = CorrectionLoop(
         Timestamp=datetime.now(),
-        code_correction_attempt=1,
         Error1="Error1 details",
         Generated_Code=CodeGeneration(
             Thought="Fixing Error1", Generated_Code="print('Fixed Hello, World!')"
@@ -148,7 +158,6 @@ if __name__ == "__main__":
     self_healing_block = SelfHealingBlock(
         time=2.5,
         Generation_ID=101,
-        Self_Healing_Attempt=1,
         Linting_Loop=[linting_attempt],
         Correction_Loop=correction_loop,
         Metric=3,
@@ -168,9 +177,9 @@ if __name__ == "__main__":
     # Run instance
     run = Run(
         Timestamp=datetime.now(),
-        Run_ID="123456789",
-        Git_SHA="abcdef12345",
-        Commit_Message="Implemented feature X",
+        Run_ID=123456789,
+        Git_SHA=("abcdef12345",),
+        Commit_Message=("Implemented feature X",),
         Tasks=[task],
     )
 

@@ -87,9 +87,7 @@ def display_linting_attempt(linting_attempt: LintingAttempt):
 
 
 def display_correction_loop(correction_loop: CorrectionLoop):
-    st.markdown(
-        f"### Code Correction Attempt: {correction_loop.code_correction_attempt}"
-    )
+    st.markdown("### Code Correction Attempt")
     st.write("Metric:", correction_loop.Metric)
     with st.container():
         st.write(f"Timestamp: {correction_loop.Timestamp}")
@@ -116,10 +114,9 @@ def display_correction_loop(correction_loop: CorrectionLoop):
 
 def display_self_healing_block(block: SelfHealingBlock):
     st.subheader(f"Generation ID: {block.Generation_ID}")
-    st.markdown(f"### Self Healing Attempt {block.Self_Healing_Attempt}")
     st.write("Time:", block.time)
     st.write("Overall Metric:", block.Metric)
-    if st.button(f"Show Details for Self Healing Attempt {block.Self_Healing_Attempt}"):
+    if st.button(f"Show Details for Self Healing Attempt {block.Generation_ID}"):
         with st.container():
             col1, col2 = st.columns(2)
             with col1:
