@@ -9,12 +9,14 @@ from codinit.experiment_tracking.experiment_pydantic_models import (
     LintingAttempt,
     SelfHealingBlock,
     Task,
+    TaskExecutionConfig,
 )
 
 
 class ExperimentLogger:
-    def __init__(self, task_id: int):
-        self.task_id = task_id
+    def __init__(
+        self,
+    ):
         # self.documentation_scraping = None
         # self.code_generation = []
         self.init_lint_attempt_logs()
@@ -54,30 +56,27 @@ class ExperimentLogger:
         )
         self.self_healing_blocks.append(self_healing_block)
 
-    # def compile_task(self):
-    #     # Assuming the first element of each list is the initial one
-    #     initial_code = InitialCode(
-    #         Documentation_Scraping=self.documentation_scraping[0],
-    #         Generated_Plan=self.code_generation[0],
-    #         Dependencies=self.dependencies[0],  # Assuming you have a method to log dependencies
-    #         Coding_Agent=self.code_generation[0]
-    #     )
-
-    #     self_healing_blocks = [SelfHealingBlock(
-    #         Linting_Loop=linting_attempt,
-    #         Correction_Loop=correction_loop,
-    #         # Other fields...
-    #     ) for linting_attempt, correction_loop in zip(self.linting_attempts, self.correction_loops)]
-
-    #     return Task(
-    #         Task_ID=self.task_id,
-    #         Task="Your task description here",  # You may want to log this somewhere
-    #         Metric=calculate_metric(self_healing_blocks),  # Implement this function based on your metric calculation
-    #         Time=datetime.now(),  # Or log the start time of the task
-    #         TaskExecutorConfig=TaskExecutionConfig(),  # Initialize appropriately
-    #         Initial_Code=self.initial_code,
-    #         Generation_Attempts=self_healing_blocks
-    #     )
+    def compile_task(
+        self,
+        task_id: int,
+        task_description: str,
+        time_stamp: datetime,
+        task_execution_config: TaskExecutionConfig,
+    ):
+        self.task = Task(
+            Task_ID=task_id,
+            Task=task_description,
+            Time=time_stamp,
+            TaskExecutorConfig=task_execution_config,
+            Initial_Code=self.initial_code,
+            Generation_Attempts=self.self_healing_blocks,
+            Metric=sum(
+                [
+                    self_healing_block.Metric
+                    for self_healing_block in self.self_healing_blocks
+                ]
+            ),
+        )
 
     # def save_to_json(self):
     #     task = self.compile_task()

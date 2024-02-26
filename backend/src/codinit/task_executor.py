@@ -86,7 +86,7 @@ class TaskExecutor:
         self.sha = (sha,)
         self.message = (message,)
         self.csv_writer = csv_writer
-        self.experiment_logger: ExperimentLogger = ExperimentLogger(task_id=task_id)
+        self.experiment_logger: ExperimentLogger = ExperimentLogger()
 
     def install_dependencies(self, deps: List[str]) -> str:
         # if it's a string, e.g. "['openai']", turn into list ['openai']
@@ -429,6 +429,7 @@ class TaskExecutor:
         library: Library,
         source_code: Optional[str] = None,
     ):
+        time_stamp = datetime.now()
         client = get_weaviate_client()
         attempt = 0
         initial_code_generation = self.initial_code_generation(
@@ -453,4 +454,10 @@ class TaskExecutor:
                 attempt=attempt,
             )
             attempt += 1
+        self.experiment_logger.compile_task(
+            task_id=self.task_id,
+            task_description=self.task,
+            time_stamp=time_stamp,
+            task_execution_config=self.config,
+        )
         return new_code
