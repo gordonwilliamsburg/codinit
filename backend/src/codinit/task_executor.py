@@ -32,6 +32,7 @@ from codinit.experiment_tracking.experiment_pydantic_models import (
     DocumentationScraping,
     GeneratedPlan,
     InitialCode,
+    LintingAttempt,
     TaskExecutionConfig,
 )
 from codinit.weaviate_client import get_weaviate_client
@@ -273,8 +274,8 @@ class TaskExecutor:
         new_code: str,
         relevant_docs: str,
         deps: List[str],
-        time_stamp: datetime,
     ):
+        time_stamp = datetime.now()
         lint_attempt = 0
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
@@ -287,32 +288,58 @@ class TaskExecutor:
             error="no runtime",
             time_stamp=time_stamp,
         )
+        self.experiment_logger.init_lint_attempt_logs()
+        linting_attempt = LintingAttempt(
+            Timestamp=time_stamp,
+            lint_attempt=lint_attempt,
+            Code=formatted_code,
+            Lint_Result=lint_result,
+            Metric=metric,
+        )
+        self.experiment_logger.log_linting_attempt(linting_attempt=linting_attempt)
         logging.info(f"{lint_result=}")
         while (
             len(lint_result) > 0
             and lint_attempt < self.config.lint_correction_threshold
         ):
+            time_stamp = datetime.now()
             lint_query_results = self.linter.execute(
-                source_code=new_code, linter_output=lint_result
+                source_code=formatted_code, linter_output=lint_result
             )
+            old_code = formatted_code
             logging.info(f"{lint_query_results=}")
             lint_response = openai.chat.completions.create(
                 model="gpt-3.5-turbo-1106",
                 messages=self.linter.messages,
             )
             logging.info(f"{lint_response=}")
+            # TODO extract thought from code execution function
             new_code = self.code_corrector.execute(
                 tool_choice="execute_code",
                 chat_history=[],
                 task=self.task,
                 context=relevant_docs,
-                source_code=new_code,
+                source_code=formatted_code,
                 error=lint_response,
             )[0]
             lint_attempt += 1
             formatted_code, lint_result, metric = self.format_lint_code(
                 code=new_code, dependencies=deps
             )
+            linting_attempt = LintingAttempt(
+                Timestamp=time_stamp,
+                lint_attempt=lint_attempt,
+                Code=old_code,
+                Lint_Query_Result=lint_query_results,
+                Lint_Response=lint_response,
+                Generated_Code=CodeGeneration(
+                    Thought="", Generated_Code=formatted_code
+                ),
+                Lint_Result=lint_result,
+                Metric=metric,
+            )
+            self.experiment_logger.log_linting_attempt(linting_attempt=linting_attempt)
+            logging.info(f"{lint_result=}")
             self.write_row(
                 attempt=lint_attempt,
                 formatted_code=formatted_code,
@@ -360,14 +387,13 @@ class TaskExecutor:
         deps: List[str],
         relevant_docs: str,
         attempt: int,
-        time_stamp: datetime,
     ):
+        time_stamp = datetime.now()
         # lint code and correct linting errors in a loop
         linted_code = self.lint_and_correct_with_llm(
             new_code=new_code,
             relevant_docs=relevant_docs,
             deps=deps,
-            time_stamp=time_stamp,
         )
         # run generated code and correct resulting error
         error, new_code = self.runtime_and_correct_with_llm(
@@ -396,20 +422,17 @@ class TaskExecutor:
             deps=initial_code_generation.Dependencies.Dependencies,
             relevant_docs=initial_code_generation.Documentation_Scraping.Relevant_Docs,
             attempt=attempt,
-            time_stamp=initial_code_generation.Timestamp,
         )
         attempt = 1
         while "Failed" in error:
             if attempt > self.config.coding_attempts:
                 break
-            time_stamp = datetime.now()
             # corrected code
             error, new_code = self.code_correction_with_linting(
                 new_code=new_code,
                 deps=initial_code_generation.Dependencies.Dependencies,
                 relevant_docs=initial_code_generation.Documentation_Scraping.Relevant_Docs,
                 attempt=attempt,
-                time_stamp=time_stamp,
             )
             attempt += 1
         return new_code

@@ -4,6 +4,7 @@ from datetime import datetime
 from codinit.experiment_tracking.experiment_pydantic_models import (
     DocumentationScraping,
     InitialCode,
+    LintingAttempt,
     SelfHealingBlock,
     Task,
 )
@@ -14,7 +15,7 @@ class ExperimentLogger:
         self.task_id = task_id
         # self.documentation_scraping = None
         # self.code_generation = []
-        # self.linting_attempts = []
+        self.init_lint_attempt_logs()
         # self.correction_loops = []
 
     def log_initial_code(self, initial_code: InitialCode):
@@ -23,8 +24,11 @@ class ExperimentLogger:
     # def log_code_generation(self, data):
     #     self.code_generation.append(data)
 
-    # def log_linting_attempt(self, data):
-    #     self.linting_attempts.append(data)
+    def init_lint_attempt_logs(self):
+        self.linting_attempts = []
+
+    def log_linting_attempt(self, linting_attempt: LintingAttempt):
+        self.linting_attempts.append(linting_attempt)
 
     # def log_correction_loop(self, data):
     #     self.correction_loops.append(data)
