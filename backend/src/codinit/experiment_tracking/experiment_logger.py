@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from codinit.experiment_tracking.experiment_pydantic_models import (
+    CorrectionLoop,
     DocumentationScraping,
     InitialCode,
     LintingAttempt,
@@ -16,6 +17,8 @@ class ExperimentLogger:
         # self.documentation_scraping = None
         # self.code_generation = []
         self.init_lint_attempt_logs()
+        self.init_correction_loop_logs()
+        # self.linting_attempts = []
         # self.correction_loops = []
 
     def log_initial_code(self, initial_code: InitialCode):
@@ -30,8 +33,11 @@ class ExperimentLogger:
     def log_linting_attempt(self, linting_attempt: LintingAttempt):
         self.linting_attempts.append(linting_attempt)
 
-    # def log_correction_loop(self, data):
-    #     self.correction_loops.append(data)
+    def init_correction_loop_logs(self):
+        self.correction_loops = []
+
+    def log_correction_loop(self, correction_loop: CorrectionLoop):
+        self.correction_loops.append(correction_loop)
 
     # def compile_task(self):
     #     # Assuming the first element of each list is the initial one

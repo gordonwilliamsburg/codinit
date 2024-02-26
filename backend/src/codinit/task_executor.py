@@ -28,6 +28,7 @@ from codinit.documentation.save_document import ScraperSaver
 from codinit.experiment_tracking.experiment_logger import ExperimentLogger
 from codinit.experiment_tracking.experiment_pydantic_models import (
     CodeGeneration,
+    CorrectionLoop,
     Dependencies,
     DocumentationScraping,
     GeneratedPlan,
@@ -308,9 +309,13 @@ class TaskExecutor:
             )
             old_code = formatted_code
             logging.info(f"{lint_query_results=}")
-            lint_response = openai.chat.completions.create(
-                model="gpt-3.5-turbo-1106",
-                messages=self.linter.messages,
+            lint_response = (
+                openai.chat.completions.create(
+                    model="gpt-3.5-turbo-1106",
+                    messages=self.linter.messages,
+                )
+                .choices[0]
+                .message
             )
             logging.info(f"{lint_response=}")
             # TODO extract thought from code execution function
@@ -356,30 +361,42 @@ class TaskExecutor:
         relevant_docs: str,
         attempt: int,
         deps: List[str],
-        time_stamp: datetime,
     ):
-        error = self.run_code(new_code)
+        self.experiment_logger.init_correction_loop_logs()
+        time_stamp = datetime.now()
+        # run generated code and correct resulting error
+        error1 = self.run_code(new_code)
         new_code = self.code_corrector.execute(
             tool_choice="execute_code",
             chat_history=[],
             task=self.task,
             context=relevant_docs,
             source_code=new_code,
-            error=error,
+            error=error1,
         )[0]
         formatted_code, lint_result, metric = self.format_lint_code(
             code=new_code, dependencies=deps
         )
-        error = self.run_code(new_code)
+        error2 = self.run_code(new_code)
+        correction_loop = CorrectionLoop(
+            Timestamp=time_stamp,
+            code_correction_attempt=0,
+            Error1=error1,
+            Generated_Code=CodeGeneration(Thought="", Generated_Code=formatted_code),
+            Lint_Result=lint_result,
+            Error2=error2,
+            Metric=metric,
+        )
+        self.experiment_logger.log_correction_loop(correction_loop=correction_loop)
         self.write_row(
             attempt=attempt,
             formatted_code=formatted_code,
             lint_result=lint_result,
             metric=metric,
-            error=error,
+            error=error2,
             time_stamp=time_stamp,
         )
-        return error, new_code
+        return error2, new_code
 
     def code_correction_with_linting(
         self,
@@ -388,7 +405,7 @@ class TaskExecutor:
         relevant_docs: str,
         attempt: int,
     ):
-        time_stamp = datetime.now()
+        # time_stamp = datetime.now()
         # lint code and correct linting errors in a loop
         linted_code = self.lint_and_correct_with_llm(
             new_code=new_code,
@@ -401,7 +418,6 @@ class TaskExecutor:
             relevant_docs=relevant_docs,
             attempt=attempt,
             deps=deps,
-            time_stamp=time_stamp,
         )
         return error, new_code
 
