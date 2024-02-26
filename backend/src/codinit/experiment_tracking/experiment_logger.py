@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from typing import List
 
 from codinit.experiment_tracking.experiment_pydantic_models import (
     CorrectionLoop,
@@ -18,6 +19,7 @@ class ExperimentLogger:
         # self.code_generation = []
         self.init_lint_attempt_logs()
         self.init_correction_loop_logs()
+        self.self_healing_blocks: List[SelfHealingBlock] = []
         # self.linting_attempts = []
         # self.correction_loops = []
 
@@ -37,7 +39,20 @@ class ExperimentLogger:
         self.correction_loops = []
 
     def log_correction_loop(self, correction_loop: CorrectionLoop):
-        self.correction_loops.append(correction_loop)
+        self.correction_loop = correction_loop
+
+    def log_self_healing_block(self, time: float, generation_id: int):
+        self_healing_block = SelfHealingBlock(
+            time=time,
+            Generation_ID=generation_id,
+            Metric=sum(
+                [linting_attempt.Metric for linting_attempt in self.linting_attempts]
+            )
+            + self.correction_loop.Metric,
+            Linting_Loop=self.linting_attempts,
+            Correction_Loop=self.correction_loop,
+        )
+        self.self_healing_blocks.append(self_healing_block)
 
     # def compile_task(self):
     #     # Assuming the first element of each list is the initial one

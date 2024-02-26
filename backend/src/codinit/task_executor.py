@@ -380,7 +380,6 @@ class TaskExecutor:
         error2 = self.run_code(new_code)
         correction_loop = CorrectionLoop(
             Timestamp=time_stamp,
-            code_correction_attempt=0,
             Error1=error1,
             Generated_Code=CodeGeneration(Thought="", Generated_Code=formatted_code),
             Lint_Result=lint_result,
@@ -405,7 +404,7 @@ class TaskExecutor:
         relevant_docs: str,
         attempt: int,
     ):
-        # time_stamp = datetime.now()
+        time_stamp = datetime.now()
         # lint code and correct linting errors in a loop
         linted_code = self.lint_and_correct_with_llm(
             new_code=new_code,
@@ -419,6 +418,9 @@ class TaskExecutor:
             attempt=attempt,
             deps=deps,
         )
+        end_time_stamp = datetime.now()
+        time = (end_time_stamp - time_stamp).total_seconds()
+        self.experiment_logger.log_self_healing_block(time=time, generation_id=attempt)
         return error, new_code
 
     # TODO: add plan to benchmark

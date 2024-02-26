@@ -58,7 +58,6 @@ class LintingAttempt(BaseModel):
 
 class CorrectionLoop(BaseModel):
     Timestamp: datetime
-    code_correction_attempt: int
     Error1: str
     Generated_Code: CodeGeneration
     Lint_Result: List[str]
@@ -69,7 +68,6 @@ class CorrectionLoop(BaseModel):
 class SelfHealingBlock(BaseModel):
     time: float
     Generation_ID: int
-    Self_Healing_Attempt: int
     Linting_Loop: List[LintingAttempt]
     Correction_Loop: CorrectionLoop
     Metric: int
@@ -147,7 +145,6 @@ if __name__ == "__main__":
     # CorrectionLoop instance
     correction_loop = CorrectionLoop(
         Timestamp=datetime.now(),
-        code_correction_attempt=1,
         Error1="Error1 details",
         Generated_Code=CodeGeneration(
             Thought="Fixing Error1", Generated_Code="print('Fixed Hello, World!')"
@@ -161,7 +158,6 @@ if __name__ == "__main__":
     self_healing_block = SelfHealingBlock(
         time=2.5,
         Generation_ID=101,
-        Self_Healing_Attempt=1,
         Linting_Loop=[linting_attempt],
         Correction_Loop=correction_loop,
         Metric=3,
