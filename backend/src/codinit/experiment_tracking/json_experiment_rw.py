@@ -1,12 +1,15 @@
 import json
+import os
 
 from pydantic import TypeAdapter
 
-from codinit.experiment_tracking.experiment_pydantic_models import Run
+from codinit.experiment_tracking.experiment_pydantic_models import Run, Task
 
 
 # Write a list of Run objects to a JSON file
 def write_to_json(file_path: str, data: Run):
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "w", encoding="utf-8") as file:
         # Convert the Pydantic models to JSON
         json_data = data.model_dump_json()

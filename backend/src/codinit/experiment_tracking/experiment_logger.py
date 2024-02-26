@@ -18,19 +18,12 @@ class ExperimentLogger:
     def __init__(
         self,
     ):
-        # self.documentation_scraping = None
-        # self.code_generation = []
         self.init_lint_attempt_logs()
         self.init_correction_loop_logs()
         self.self_healing_blocks: List[SelfHealingBlock] = []
-        # self.linting_attempts = []
-        # self.correction_loops = []
 
     def log_initial_code(self, initial_code: InitialCode):
         self.initial_code = initial_code
-
-    # def log_code_generation(self, data):
-    #     self.code_generation.append(data)
 
     def init_lint_attempt_logs(self):
         self.linting_attempts = []
