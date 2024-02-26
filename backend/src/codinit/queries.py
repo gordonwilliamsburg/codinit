@@ -1,8 +1,13 @@
+import logging
 from typing import List
 
 import weaviate.classes as wvc
 
 from codinit.weaviate_client import get_weaviate_client
+
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 
 def get_files(prompt: str, k: int = 1):
@@ -26,12 +31,23 @@ def get_files(prompt: str, k: int = 1):
     )
     client.close()
     files = result.objects
-    query_result = "found the following files:"
+    logging.info(f"file objects query {files=}")
+    query_result = "found the following files: "
     for file in files:
-        query_result += f'file {file.properties["name"]}'
-        query_result += f'has imports: {file.references["hasImport"].objects}'
-        query_result += f'has classes: {file.references["hasClass"].objects}'
-        query_result += f'has functions: {file.references["hasFunction"].objects}'
+        query_result += f'file {file.properties["name"]}, '
+        try:
+            query_result += f'has imports: {[object.properties["name"] for object in file.references["hasImport"].objects]}, '
+        except KeyError:
+            pass
+        try:
+            query_result += f'has classes named: {[object.properties["name"] for object in file.references["hasClass"].objects]}, '
+        except KeyError:
+            pass
+        try:
+            query_result += f'has functions named: {[object.properties["name"] for object in file.references["hasFunction"].objects]}'
+        except KeyError:
+            pass
+    logging.debug(f"query_result {query_result=}")
     return query_result
 
 
@@ -54,10 +70,14 @@ def get_classes(prompt: str, k: int = 1):
     )
     client.close()
     classes = result.objects
-    query_result = "found the following classes:"
+    logging.info(f"class objects query{classes=}")
+    query_result = "found the following classes: "
     for class_ in classes:
-        query_result += f'{class_.properties["name"]}'
-        query_result += f'has functions: {class_.references["hasFunction"].objects}'
+        query_result += f'class with name: {class_.properties["name"]} '
+        try:
+            query_result += f'has functions: {[object.properties["name"] for object in class_.references["hasFunction"].objects]}'
+        except KeyError:
+            pass
     return query_result
 
 
@@ -82,12 +102,14 @@ def get_imports(prompt: str, k: int = 1):
     )
     client.close()
     imports = result.objects
+    logging.info(f"import bjects query{imports=}")
     query_result = "found the following imports:"
     for import_ in imports:
-        query_result += f'{import_.properties["name"]}'
-        query_result += (
-            f'belongs to file: {import_.references["belongsToFile"].objects}'
-        )
+        query_result += f'import name: {import_.properties["name"]} '
+        try:
+            query_result += f'belongs to file: {[object.properties["name"] for object in import_.references["belongsToFile"].objects]}'
+        except KeyError:
+            pass
     return query_result
 
 
@@ -115,15 +137,18 @@ def get_functions(prompt: str, k: int = 1):
     )
     client.close()
     functions = result.objects
-    query_result = "found the following functions:"
+    logging.info(f"function objects query{functions=}")
+    query_result = "found the following functions: "
     for function in functions:
-        query_result += f'{function.properties["name"]}'
-        query_result += (
-            f'belongs to file: {function.references["belongsToFile"].objects}'
-        )
-        query_result += (
-            f'belongs to class: {function.references["belongsToClass"].objects}'
-        )
+        query_result += f'function named: {function.properties["name"]} '
+        try:
+            query_result += f'belongs to file: {[object.properties["name"] for object in function.references["belongsToFile"].objects]}'
+        except KeyError:
+            pass
+        try:
+            query_result += f'belongs to class: {[object.properties["name"] for object in function.references["belongsToClass"].objects]}'
+        except KeyError:
+            pass
     return result.objects
 
 
@@ -145,3 +170,10 @@ def get_imports_from_kg(import_list: List[str], library_name: str, k=10):
         exists_in_weaviate_kg = get_exact_imports(query=import_name, k=k)
         result[import_name] = exists_in_weaviate_kg
     return result
+
+
+if __name__ == "__main__":
+    get_classes("Agent")
+    get_imports("Agent")
+    get_functions("execute")
+    get_files("agent.py")
