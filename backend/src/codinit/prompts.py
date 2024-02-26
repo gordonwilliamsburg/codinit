@@ -257,11 +257,7 @@ prompt=PromptTemplate.from_template(prompt_template)
 llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0.5, max_tokens=1024)
 llm_chain =LLMChain(llm=llm, prompt=prompt)
 
-Please pay attention to your module imports. Only import modules and functions as they appear in the documentation.
-
-Keep things simple. Define each code functionality separately. DO NOT NEST CODE!!!!
-
-You should ALWAYS output the full code.
+Make sure to write the complete code that fulfills the task!
 Now please help with the subtask below.
 Make sure to call the "execute_code" function to run your code!!
 Do not install any dependencies! all dependencies have been installed already.
