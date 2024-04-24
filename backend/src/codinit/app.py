@@ -80,54 +80,23 @@ async def generate(websocket: WebSocket):
                 message=message,
                 csv_writer=writer,
             )
-            time_stamp = datetime.datetime.now().isoformat()
             client = get_weaviate_client()
-            task_executor.scrape_docs(library=library)
-            relevant_docs = task_executor.get_docs(
-                library=library, task=task, client=client
-            )
-            plan = task_executor.planner.execute(
-                tool_choice="execute_plan",
-                chat_history=[],
-                task=task,
-                context=relevant_docs,
-            )[0]
-            await websocket.send_json({"plan": "\n".join(plan), "code": ""})
-            # install dependencies from plan
-            if (
-                task_executor.config.execute_code
-                and task_executor.config.install_dependencies
-            ):
-                deps = task_executor.dependency_tracker.execute(
-                    tool_choice="install_dependencies", chat_history=[], plan=plan
-                )[0]
-                await websocket.send_json(
-                    {
-                        "plan": "",
-                        "code": "",
-                        "error": f"dependencies to install: {deps}",
-                    }
-                )
-                task_executor.install_dependencies(deps)
-            chat_history = []
-            chat_history.append(
-                {"role": "assistant", "content": f"installed dependencies {deps}"}
-            )
-            # generate code
-            new_code = task_executor.coder.execute(
-                task=task,
-                tool_choice="execute_code",
-                chat_history=chat_history,
-                plan=plan,
-                context=relevant_docs,
-            )[0]
             attempt = 0
+            initial_code_generation = task_executor.initial_code_generation(
+                library=library, client=client
+            )
+            plan = initial_code_generation.Generated_Plan.Plan
+            await websocket.send_json(
+                {
+                    "plan": "\n".join(plan),
+                    "code": initial_code_generation.Coding_Agent.Generated_Code,
+                }
+            )
             error, new_code = task_executor.code_correction_with_linting(
-                new_code=new_code,
-                deps=deps,
-                relevant_docs=relevant_docs,
+                new_code=initial_code_generation.Coding_Agent.Generated_Code,
+                deps=initial_code_generation.Dependencies.Dependencies,
+                relevant_docs=initial_code_generation.Documentation_Scraping.Relevant_Docs,
                 attempt=attempt,
-                time_stamp=time_stamp,
             )
             await websocket.send_json(
                 {"plan": "\n".join(plan), "code": new_code, "error": error}
@@ -143,16 +112,13 @@ async def generate(websocket: WebSocket):
                 await websocket.send_json(
                     {"plan": "\n".join(plan), "code": new_code, "error": error}
                 )
-                time_stamp = datetime.datetime.now().isoformat()
                 # corrected code
                 error, new_code = task_executor.code_correction_with_linting(
                     new_code=new_code,
-                    deps=deps,
-                    relevant_docs=relevant_docs,
+                    deps=initial_code_generation.Dependencies.Dependencies,
+                    relevant_docs=initial_code_generation.Documentation_Scraping.Relevant_Docs,
                     attempt=attempt,
-                    time_stamp=time_stamp,
                 )
-                # await websocket.send_text(new_code)
                 attempt += 1
             await websocket.send_json(
                 {
