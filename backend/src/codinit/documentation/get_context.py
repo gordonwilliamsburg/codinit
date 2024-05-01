@@ -6,6 +6,7 @@ from typing import List, Optional
 import weaviate
 import weaviate.classes as wvc
 from apify_client import ApifyClient
+from weaviate.classes.query import Filter, QueryReference
 
 from codinit.config import (
     DocumentationSettings,
@@ -24,6 +25,10 @@ logging.basicConfig(
 )
 
 
+# TODO: here is an issue: now the weaviate client operations is entangled with the library operations
+# for example, initializing the schema is not related to a single library.
+# this should be refactored into single responsibility
+# Also better make an abstract class for library search so that in the future can be able to impelement other search dbs
 class BaseWeaviateDocClient:
     """
     Base class for weaviate Documentation client.
@@ -120,6 +125,76 @@ class BaseWeaviateDocClient:
     # TODO create test for this class
     def init_schema(self):
         init_library_schema_weaviate(client=self.client)
+
+    def delete_related_documents(self):
+        self.client.connect()
+        try:
+            documentation = client.collections.get("DocumentationFile")
+
+            # Construct a filter to find all documents linked to the specific library
+            filter_criteria = (
+                Filter.by_ref(link_on="fromLibrary")
+                .by_property("name")
+                .equal(self.library.libname)
+            )
+
+            # Query to fetch all DocumentationFiles related to the specific Library ID
+            response = documentation.query.fetch_objects(
+                filters=filter_criteria,
+                return_references=QueryReference(
+                    link_on="fromLibrary", return_properties=["name"]
+                ),
+                limit=10000,  # Adjust the limit based on expected maximum or paginate queries
+            )
+            logging.info(f"deleting all documents from library {self.library.libname}")
+            # Delete each DocumentationFile found
+            for doc in response.objects:
+                documentation.data.delete_by_id(doc.uuid)
+                doc_query_response = documentation.query.fetch_object_by_id(doc.uuid)
+                if doc_query_response is None:
+                    logging.info(f"Document {doc.uuid} successfully deleted.")
+                else:
+                    logging.info(f"Document {doc.uuid} still exists.")
+        finally:
+            client.close()
+
+    def delete_library(self):
+        self.client.connect()
+        try:
+            library_collection = self.client.collections.get("Library")
+
+            # Query to fetch the library by name
+            library = library_collection.query.fetch_objects(
+                filters=Filter.by_property("name").equal(self.library.libname),
+                limit=1,  # Assuming library names are unique
+            )
+            logging.info(f"Deleting library {self.library.libname}")
+            if library.objects:
+                library_id = library.objects[0].uuid
+                # Delete the library by its ID
+                library_collection.data.delete_by_id(library_id)
+
+                # Verify the deletion
+                lib_query_response = library_collection.query.fetch_object_by_id(
+                    library_id
+                )
+                if lib_query_response is None:
+                    logging.info(
+                        f"Library {self.library.libname} successfully deleted."
+                    )
+                else:
+                    logging.info(f"Library {self.library.libname} still exists.")
+            else:
+                logging.info(f"No library found with the name {self.library.libname}.")
+        finally:
+            self.client.close()
+
+    def delete_library_and_documents(self):
+        # First, delete all related documentation files
+        self.delete_related_documents()
+
+        # Then, if all documents are successfully deleted, delete the library itself
+        self.delete_library()
 
 
 # refactor the following document to put all functions under one class
@@ -332,30 +407,52 @@ class WeaviateDocQuerier(BaseWeaviateDocClient):
 
 
 if __name__ == "__main__":
-    libname = "langchain"
-    links = [
-        "https://langchain-langchain.vercel.app/docs/get_started/",
-        # "https://python.langchain.com/docs/modules/",
-        # "https://python.langchain.com/docs/use_cases",
-        # "https://python.langchain.com/docs/guides",
-        # "https://python.langchain.com/docs/integrations",
-    ]
-    library_repo_url = "https://github.com/langchain-ai/langchain.git"
-    library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
+    # libname = "langchain"
+    # links = [
+    #     "https://langchain-langchain.vercel.app/docs/get_started/",
+    #     # "https://python.langchain.com/docs/modules/",
+    #     # "https://python.langchain.com/docs/use_cases",
+    #     # "https://python.langchain.com/docs/guides",
+    #     # "https://python.langchain.com/docs/integrations",
+    # ]
+    # library_repo_url = "https://github.com/langchain-ai/langchain.git"
+    # library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
 
-    client = get_weaviate_client()
-    # base_weaviate_doc_client = BaseWeaviateDocClient(library=library, client=client)
-    # base_weaviate_doc_client.run()
-    weaviate_doc_loader = WeaviateDocLoader(library=library, client=client)
-    # weaviate_doc_loader.run()
+    # client = get_weaviate_client()
+    # # base_weaviate_doc_client = BaseWeaviateDocClient(library=library, client=client)
+    # # base_weaviate_doc_client.run()
+    # weaviate_doc_loader = WeaviateDocLoader(library=library, client=client)
+    # # weaviate_doc_loader.run()
 
-    weaviate_doc_querier = WeaviateDocQuerier(
-        library=library, client=weaviate_doc_loader.client
-    )
-    docs = weaviate_doc_querier.get_relevant_documents(
-        query="Using the langchain library, write code that illustrates usage of the library."
-    )
-    print(docs)
+    # weaviate_doc_querier = WeaviateDocQuerier(
+    #     library=library, client=weaviate_doc_loader.client
+    # )
+    # docs = weaviate_doc_querier.get_relevant_documents(
+    #     query="Using the langchain library, write code that illustrates usage of the library."
+    # )
+    # print(docs)
     # print(weaviate_doc_loader.get_lib_id())
     # num_docs = weaviate_doc_loader.check_library_has_docs(lib_id="some_id")
     # print(num_docs)
+
+    libname = "quadquery"
+    links = [
+        "https://cadquery.readthedocs.io/en/latest/index.html",
+    ]
+    library_repo_url = "https://github.com/CadQuery/cadquery.git"
+    library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
+
+    client = get_weaviate_client()
+    base_weaviate_doc_client = BaseWeaviateDocClient(library=library, client=client)
+    base_weaviate_doc_client.delete_library()
+
+    # weaviate_doc_loader = WeaviateDocLoader(library=library, client=client)
+    # # weaviate_doc_loader.run()
+
+    # weaviate_doc_querier = WeaviateDocQuerier(
+    #     library=library, client=weaviate_doc_loader.client
+    # )
+    # docs = weaviate_doc_querier.get_relevant_documents(
+    #     query="Using the langchain library, write code that illustrates usage of the library."
+    # )
+    # print(docs)
