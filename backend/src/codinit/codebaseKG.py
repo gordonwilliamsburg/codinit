@@ -9,6 +9,7 @@ import weaviate
 import weaviate.classes as wvc
 from git import Repo
 from openai import RateLimitError
+from weaviate.classes.query import Filter
 
 from codinit.weaviate_client import get_weaviate_client
 
@@ -502,6 +503,18 @@ def run_codebase_analysis(
     logging.info(f"Analysis for {libname=} completed successfully")
 
 
+def delete_library_KG(libname: str, client: weaviate.WeaviateClient) -> None:
+    logging.info(f"Deleting {libname=}")
+    client = get_weaviate_client()
+    client.connect()
+    collection = client.collections.get("Repository")
+    collection.data.delete_many(
+        where=Filter.by_property("name").contains_any([libname])
+    )
+    logging.info(f"Deleted successfully the codebase KG of {libname=}")
+    client.close()
+
+
 # check if repo has been cloned
 # if not, clone it
 # check if repo has been analyzed
@@ -509,13 +522,15 @@ def run_codebase_analysis(
 if __name__ == "__main__":
     from codinit.config import secrets
 
-    libname = "langchain"
-    repo_dir = secrets.repo_dir
-    repo_url = "https://github.com/langchain-ai/langchain.git"
+    # libname = "langchain"
+    # repo_dir = secrets.repo_dir
+    # repo_url = "https://github.com/langchain-ai/langchain.git"
     client = get_weaviate_client()
-    run_codebase_analysis(
-        repo_dir=repo_dir, libname=libname, repo_url=repo_url, client=client
-    )
+    # run_codebase_analysis(
+    #     repo_dir=repo_dir, libname=libname, repo_url=repo_url, client=client
+    # )
+    libname = "quadquery"
+    delete_library_KG(libname=libname, client=client)
     """
     analyze_directory(
         directory= repo_dir + "/libs/langchain/langchain",
