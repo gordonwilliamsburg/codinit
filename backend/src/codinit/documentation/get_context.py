@@ -158,6 +158,37 @@ class BaseWeaviateDocClient:
         finally:
             client.close()
 
+    def delete_library(self):
+        self.client.connect()
+        try:
+            library_collection = self.client.collections.get("Library")
+
+            # Query to fetch the library by name
+            library = library_collection.query.fetch_objects(
+                filters=Filter.by_property("name").equal(self.library.libname),
+                limit=1,  # Assuming library names are unique
+            )
+            logging.info(f"Deleting library {self.library.libname}")
+            if library.objects:
+                library_id = library.objects[0].uuid
+                # Delete the library by its ID
+                library_collection.data.delete_by_id(library_id)
+
+                # Verify the deletion
+                lib_query_response = library_collection.query.fetch_object_by_id(
+                    library_id
+                )
+                if lib_query_response is None:
+                    logging.info(
+                        f"Library {self.library.libname} successfully deleted."
+                    )
+                else:
+                    logging.info(f"Library {self.library.libname} still exists.")
+            else:
+                logging.info(f"No library found with the name {self.library.libname}.")
+        finally:
+            self.client.close()
+
 
 # refactor the following document to put all functions under one class
 class WeaviateDocLoader(BaseWeaviateDocClient):
@@ -406,7 +437,7 @@ if __name__ == "__main__":
 
     client = get_weaviate_client()
     base_weaviate_doc_client = BaseWeaviateDocClient(library=library, client=client)
-    base_weaviate_doc_client.delete_related_documents()
+    base_weaviate_doc_client.delete_library()
 
     # weaviate_doc_loader = WeaviateDocLoader(library=library, client=client)
     # # weaviate_doc_loader.run()
