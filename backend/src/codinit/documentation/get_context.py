@@ -189,6 +189,13 @@ class BaseWeaviateDocClient:
         finally:
             self.client.close()
 
+    def delete_library_and_documents(self):
+        # First, delete all related documentation files
+        self.delete_related_documents()
+
+        # Then, if all documents are successfully deleted, delete the library itself
+        self.delete_library()
+
 
 # refactor the following document to put all functions under one class
 class WeaviateDocLoader(BaseWeaviateDocClient):
@@ -400,16 +407,16 @@ class WeaviateDocQuerier(BaseWeaviateDocClient):
 
 
 if __name__ == "__main__":
-    libname = "langchain"
-    links = [
-        "https://langchain-langchain.vercel.app/docs/get_started/",
-        # "https://python.langchain.com/docs/modules/",
-        # "https://python.langchain.com/docs/use_cases",
-        # "https://python.langchain.com/docs/guides",
-        # "https://python.langchain.com/docs/integrations",
-    ]
-    library_repo_url = "https://github.com/langchain-ai/langchain.git"
-    library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
+    # libname = "langchain"
+    # links = [
+    #     "https://langchain-langchain.vercel.app/docs/get_started/",
+    #     # "https://python.langchain.com/docs/modules/",
+    #     # "https://python.langchain.com/docs/use_cases",
+    #     # "https://python.langchain.com/docs/guides",
+    #     # "https://python.langchain.com/docs/integrations",
+    # ]
+    # library_repo_url = "https://github.com/langchain-ai/langchain.git"
+    # library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
 
     # client = get_weaviate_client()
     # # base_weaviate_doc_client = BaseWeaviateDocClient(library=library, client=client)
@@ -428,12 +435,12 @@ if __name__ == "__main__":
     # num_docs = weaviate_doc_loader.check_library_has_docs(lib_id="some_id")
     # print(num_docs)
 
-    # libname = "quadquery"
-    # links = [
-    #     "https://cadquery.readthedocs.io/en/latest/index.html",
-    # ]
-    # library_repo_url = "https://github.com/CadQuery/cadquery.git"
-    # library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
+    libname = "quadquery"
+    links = [
+        "https://cadquery.readthedocs.io/en/latest/index.html",
+    ]
+    library_repo_url = "https://github.com/CadQuery/cadquery.git"
+    library = Library(libname=libname, links=links, lib_repo_url=library_repo_url)
 
     client = get_weaviate_client()
     base_weaviate_doc_client = BaseWeaviateDocClient(library=library, client=client)
