@@ -70,7 +70,7 @@ def file_already_exists(
             limit=5,
         )
         logging.debug(f"Query if file already exists: {query_file_result=}")
-
+        client.close()
         # Process the result to check if a file with the same link exists
         file_exists = False
         for item in query_file_result.objects:
@@ -438,7 +438,7 @@ def analyze_directory(
                         from_property="hasFile",
                         to=file_id,
                     )
-
+    weaviate_client.close()
     return directory_id
 
 
